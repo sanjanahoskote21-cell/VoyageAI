@@ -7,13 +7,9 @@ from datetime import datetime
 
 
 class TripPlaceInput(BaseModel):
-    """
-    A single place the user wants to visit — either a reference
-    to an existing Place, or a custom one they typed themselves.
-    """
-    place_id: Optional[UUID] = None       # set if picked from search
-    custom_name: Optional[str] = None     # set if user typed a custom place
-    custom_city: Optional[str] = None     # optional, helps with geocoding later
+    place_id: Optional[UUID] = None
+    custom_name: Optional[str] = None
+    custom_city: Optional[str] = None
 
 
 class TripCreate(BaseModel):
@@ -21,8 +17,8 @@ class TripCreate(BaseModel):
     end_location: Optional[str] = None
     num_days: int
     num_travelers: int = 1
-    budget_tier: str          # "budget" | "mid" | "luxury"
-    travel_mode: str          # "car" | "bike" | "public_transport"
+    budget_tier: str
+    travel_mode: str
     places: list[TripPlaceInput]
 
 
@@ -33,6 +29,15 @@ class TripPlaceResponse(BaseModel):
     resolved_latitude: float
     resolved_longitude: float
     visit_order: Optional[int] = None
+
+    model_config = {"from_attributes": True}
+
+class BudgetEstimateResponse(BaseModel):
+    hotel_cost: float
+    food_cost: float
+    fuel_cost: float
+    misc_cost: float
+    total_cost: float
 
     model_config = {"from_attributes": True}
 
@@ -49,5 +54,6 @@ class TripResponse(BaseModel):
     distance_saved_km: Optional[float] = None
     created_at: datetime
     places: list[TripPlaceResponse] = Field(default=[], validation_alias="trip_places")
+    budget: Optional[BudgetEstimateResponse] = Field(default=None, validation_alias="budget_estimate")
 
     model_config = {"from_attributes": True, "populate_by_name": True}

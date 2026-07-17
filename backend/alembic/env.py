@@ -11,6 +11,9 @@ from app.db.base import Base
 from app.models.user import User
 from app.models.trip import Trip
 from app.models.place import Place
+from app.models.budget import BudgetEstimate
+from app.models.hotel import Hotel
+from app.models.restaurant import Restaurant
 from app.core.config import get_settings
 
 # this is the Alembic Config object

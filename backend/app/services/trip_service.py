@@ -5,9 +5,11 @@ from fastapi import HTTPException, status
 
 from app.models.trip import Trip, TripPlace
 from app.models.place import Place
+from app.models.budget import BudgetEstimate
 from app.models.user import User
 from app.schemas.trip import TripCreate
 from app.services.route_optimizer import optimize_route, Point
+from app.services.budget_service import calculate_budget
 
 
 def geocode_place_name(name: str, city: str | None) -> tuple[float, float]:
@@ -15,7 +17,6 @@ def geocode_place_name(name: str, city: str | None) -> tuple[float, float]:
 
 
 def _sorted_places(trip: Trip) -> Trip:
-    """Sorts a trip's places by visit_order, pushing unordered ones to the end."""
     trip.trip_places.sort(key=lambda tp: (tp.visit_order is None, tp.visit_order))
     return trip
 
@@ -64,11 +65,9 @@ def create_trip(db: Session, user: User, trip_data: TripCreate) -> Trip:
         db.add(trip_place)
         trip_places.append(trip_place)
 
-    db.flush()  # ensures every trip_place has its id before optimization
+    db.flush()
 
     # --- Route optimization ---
-    # TODO: once geocoding/Maps API is integrated, use the real start_location
-    # coordinates as the anchor point instead of the first place in the list.
     points = []
     for tp in trip_places:
         if tp.place_id:
@@ -93,6 +92,27 @@ def create_trip(db: Session, user: User, trip_data: TripCreate) -> Trip:
 
     elif len(points) == 1:
         trip_places[0].visit_order = 0
+
+    # --- Budget calculation ---
+    trip_cities = list({tp.display_city for tp in trip_places if tp.display_city})
+    budget_result = calculate_budget(
+        db=db,
+        cities=trip_cities,
+        budget_tier=new_trip.budget_tier,
+        num_days=new_trip.num_days,
+        num_travelers=new_trip.num_travelers,
+        total_distance_km=new_trip.total_distance_km or 0,
+        travel_mode=new_trip.travel_mode,
+    )
+    budget_estimate = BudgetEstimate(
+        trip_id=new_trip.id,
+        hotel_cost=budget_result["hotel_cost"],
+        food_cost=budget_result["food_cost"],
+        fuel_cost=budget_result["fuel_cost"],
+        misc_cost=budget_result["misc_cost"],
+        total_cost=budget_result["total_cost"],
+    )
+    db.add(budget_estimate)
 
     db.commit()
     db.refresh(new_trip)
