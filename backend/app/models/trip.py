@@ -21,6 +21,9 @@ class Trip(Base):
     budget_tier = Column(String, nullable=False)
     travel_mode = Column(String, nullable=False)
 
+    total_distance_km = Column(Float, nullable=True)
+    distance_saved_km = Column(Float, nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     owner = relationship("User", backref="trips")

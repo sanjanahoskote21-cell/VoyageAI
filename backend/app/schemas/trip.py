@@ -34,6 +34,8 @@ class TripResponse(BaseModel):
     num_travelers: int
     budget_tier: str
     travel_mode: str
+    total_distance_km: Optional[float] = None
+    distance_saved_km: Optional[float] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

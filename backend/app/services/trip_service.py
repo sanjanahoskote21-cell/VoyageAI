@@ -7,13 +7,10 @@ from app.models.trip import Trip, TripPlace
 from app.models.place import Place
 from app.models.user import User
 from app.schemas.trip import TripCreate
+from app.services.route_optimizer import optimize_route, Point
 
 
 def geocode_place_name(name: str, city: str | None) -> tuple[float, float]:
-    """
-    Placeholder for Maps API geocoding integration.
-    Will be implemented in the Maps integration phase.
-    """
     raise NotImplementedError("Geocoding not yet implemented")
 
 
@@ -28,8 +25,9 @@ def create_trip(db: Session, user: User, trip_data: TripCreate) -> Trip:
         travel_mode=trip_data.travel_mode,
     )
     db.add(new_trip)
-    db.flush()  # assigns new_trip.id without committing yet
+    db.flush()
 
+    trip_places = []
     for place_input in trip_data.places:
         if place_input.place_id:
             place = db.query(Place).filter(Place.id == place_input.place_id).first()
@@ -58,6 +56,37 @@ def create_trip(db: Session, user: User, trip_data: TripCreate) -> Trip:
             )
 
         db.add(trip_place)
+        trip_places.append(trip_place)
+
+    db.flush()  # ensures every trip_place has its id before optimization
+
+    # --- Route optimization ---
+    # TODO: once geocoding/Maps API is integrated, use the real start_location
+    # coordinates as the anchor point instead of the first place in the list.
+    points = []
+    for tp in trip_places:
+        if tp.place_id:
+            place = db.query(Place).filter(Place.id == tp.place_id).first()
+            points.append(Point(id=str(tp.id), latitude=place.latitude, longitude=place.longitude))
+        else:
+            points.append(Point(id=str(tp.id), latitude=tp.latitude, longitude=tp.longitude))
+
+    if len(points) >= 2:
+        start_point, remaining_points = points[0], points[1:]
+        result = optimize_route(start_point, remaining_points)
+
+        visit_order_map = {pid: i + 1 for i, pid in enumerate(result["ordered_place_ids"])}
+        for tp in trip_places:
+            if str(tp.id) in visit_order_map:
+                tp.visit_order = visit_order_map[str(tp.id)]
+            elif str(tp.id) == start_point.id:
+                tp.visit_order = 0
+
+        new_trip.total_distance_km = result["optimized_distance_km"]
+        new_trip.distance_saved_km = result["distance_saved_km"]
+
+    elif len(points) == 1:
+        trip_places[0].visit_order = 0
 
     db.commit()
     db.refresh(new_trip)
@@ -67,10 +96,7 @@ def create_trip(db: Session, user: User, trip_data: TripCreate) -> Trip:
 def get_trip(db: Session, user: User, trip_id: str) -> Trip:
     trip = db.query(Trip).filter(Trip.id == trip_id, Trip.user_id == user.id).first()
     if not trip:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Trip not found.",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found.")
     return trip
 
 
