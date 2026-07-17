@@ -1,6 +1,6 @@
 # app/schemas/trip.py
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
@@ -26,6 +26,17 @@ class TripCreate(BaseModel):
     places: list[TripPlaceInput]
 
 
+class TripPlaceResponse(BaseModel):
+    id: UUID
+    display_name: str
+    display_city: Optional[str] = None
+    resolved_latitude: float
+    resolved_longitude: float
+    visit_order: Optional[int] = None
+
+    model_config = {"from_attributes": True}
+
+
 class TripResponse(BaseModel):
     id: UUID
     start_location: str
@@ -37,5 +48,6 @@ class TripResponse(BaseModel):
     total_distance_km: Optional[float] = None
     distance_saved_km: Optional[float] = None
     created_at: datetime
+    places: list[TripPlaceResponse] = Field(default=[], validation_alias="trip_places")
 
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "populate_by_name": True}

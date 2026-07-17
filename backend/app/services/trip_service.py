@@ -14,6 +14,12 @@ def geocode_place_name(name: str, city: str | None) -> tuple[float, float]:
     raise NotImplementedError("Geocoding not yet implemented")
 
 
+def _sorted_places(trip: Trip) -> Trip:
+    """Sorts a trip's places by visit_order, pushing unordered ones to the end."""
+    trip.trip_places.sort(key=lambda tp: (tp.visit_order is None, tp.visit_order))
+    return trip
+
+
 def create_trip(db: Session, user: User, trip_data: TripCreate) -> Trip:
     new_trip = Trip(
         user_id=user.id,
@@ -90,14 +96,14 @@ def create_trip(db: Session, user: User, trip_data: TripCreate) -> Trip:
 
     db.commit()
     db.refresh(new_trip)
-    return new_trip
+    return _sorted_places(new_trip)
 
 
 def get_trip(db: Session, user: User, trip_id: str) -> Trip:
     trip = db.query(Trip).filter(Trip.id == trip_id, Trip.user_id == user.id).first()
     if not trip:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found.")
-    return trip
+    return _sorted_places(trip)
 
 
 def list_user_trips(db: Session, user: User) -> list[Trip]:

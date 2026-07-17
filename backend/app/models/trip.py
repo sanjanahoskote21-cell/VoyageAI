@@ -31,23 +31,36 @@ class Trip(Base):
 
 
 class TripPlace(Base):
-    """
-    A single stop on a trip — either linked to an existing Place,
-    or a custom place the user typed (e.g. a hometown village or temple).
-    """
     __tablename__ = "trip_places"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     trip_id = Column(UUID(as_uuid=True), ForeignKey("trips.id"), nullable=False, index=True)
-    place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)  # null if custom
+    place_id = Column(UUID(as_uuid=True), ForeignKey("places.id"), nullable=True)
 
     custom_name = Column(String, nullable=True)
     custom_city = Column(String, nullable=True)
-    latitude = Column(Float, nullable=True)   # filled in by geocoding if custom
-    longitude = Column(Float, nullable=True)  # filled in by geocoding if custom
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
 
-    visit_order = Column(Integer, nullable=True)  # set after route optimization runs
+    visit_order = Column(Integer, nullable=True)
 
     trip = relationship("Trip", back_populates="trip_places")
     place = relationship("Place")
+
+    @property
+    def display_name(self) -> str:
+        """Returns the place's name, whether it's a database Place or a custom one."""
+        return self.place.name if self.place else self.custom_name
+
+    @property
+    def display_city(self) -> str | None:
+        return self.place.city if self.place else self.custom_city
+
+    @property
+    def resolved_latitude(self) -> float:
+        return self.place.latitude if self.place else self.latitude
+
+    @property
+    def resolved_longitude(self) -> float:
+        return self.place.longitude if self.place else self.longitude
     
