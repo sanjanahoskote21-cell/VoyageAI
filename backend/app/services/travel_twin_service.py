@@ -14,7 +14,7 @@ from app.models.chat_message import ChatMessage
 settings = get_settings()
 genai.configure(api_key=settings.GEMINI_API_KEY)
 
-MODEL_NAME = "gemini-2.0-flash"  # fast + free-tier friendly; swap easily if needed
+MODEL_NAME = "gemini-flash-latest"  # fast + free-tier friendly; swap easily if needed
 CHAT_HISTORY_LIMIT = 10  # only send the last N messages, keeps prompt size bounded
 
 
