@@ -14,6 +14,7 @@ from app.models.place import Place
 from app.models.budget import BudgetEstimate
 from app.models.hotel import Hotel
 from app.models.restaurant import Restaurant
+from app.models.chat_message import ChatMessage
 from app.core.config import get_settings
 
 # this is the Alembic Config object

@@ -1,7 +1,7 @@
 # app/models/place.py
 
 import uuid
-from sqlalchemy import Column, String, Float
+from sqlalchemy import Column, String, Float, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import Base
 
@@ -16,3 +16,5 @@ class Place(Base):
     longitude = Column(Float, nullable=False)
     city = Column(String, nullable=False, index=True)
     avg_rating = Column(Float, nullable=True)
+    external_place_id = Column(String, unique=True, nullable=True, index=True)
+    last_synced_at = Column(DateTime, nullable=True)

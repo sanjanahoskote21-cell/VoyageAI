@@ -29,7 +29,8 @@ class Trip(Base):
     owner = relationship("User", backref="trips")
     trip_places = relationship("TripPlace", back_populates="trip", cascade="all, delete-orphan")
     budget_estimate = relationship("BudgetEstimate", back_populates="trip", uselist=False, cascade="all, delete-orphan")
-
+    chat_messages = relationship("ChatMessage", back_populates="trip")
+    
 class TripPlace(Base):
     __tablename__ = "trip_places"
 
