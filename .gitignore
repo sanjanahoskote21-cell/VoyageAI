@@ -1,0 +1,32 @@
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+
+# Virtual Environment
+venv/
+.venv/
+
+# Environment Variables
+.env
+
+# IDE
+.vscode/
+
+# Logs
+*.log
+
+# Build
+dist/
+build/
+
+# React
+coverage/
+
+# Database
+*.sqlite3
+
+# macOS
+.DS_Store
