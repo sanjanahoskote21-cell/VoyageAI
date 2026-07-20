@@ -10,7 +10,7 @@ export function TripPlannerPage() {
   const [endLocation, setEndLocation] = useState('');
   const [numDays, setNumDays] = useState(3);
   const [numTravelers, setNumTravelers] = useState(1);
-  const [budgetTier, setBudgetTier] = useState('mid-range');
+  const [budgetTier, setBudgetTier] = useState('mid');
   const [travelMode, setTravelMode] = useState('car');
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -112,7 +112,7 @@ export function TripPlannerPage() {
               className="w-full bg-slate-800 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-purple-500"
             >
               <option value="budget">Budget</option>
-              <option value="mid-range">Mid-range</option>
+              <option value="mid">Mid</option>
               <option value="luxury">Luxury</option>
             </select>
           </div>

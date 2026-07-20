@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { registerUser } from '../api/authApi';
 import { useAuth } from '../hooks/useAuth';
+import { getErrorMessage } from "../utils/getErrorMessage";
 
 export function RegisterPage() {
   const [fullName, setFullName] = useState('');
@@ -18,8 +19,8 @@ export function RegisterPage() {
       await registerUser({ email, password, full_name: fullName });
       await login({ email, password });
       navigate('/dashboard');
-    } catch {
-      setError('Could not create account. Try a different email.');
+    } catch (err) {
+      setError(getErrorMessage(err, "Could not create account"));
     }
   };
 

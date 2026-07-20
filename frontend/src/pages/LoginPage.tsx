@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { getErrorMessage } from "../utils/getErrorMessage";
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -12,13 +13,13 @@ export function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    try {
-      await login({ email, password });
-      navigate('/dashboard');
-    } catch {
-      setError('Invalid email or password.');
-    }
-  };
+   try {
+    await login({ email, password });
+    navigate('/dashboard');
+} catch (err) {
+    console.error('Login failed:', err);
+    setError(getErrorMessage(err, 'Invalid email or password.'));
+}
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
@@ -58,4 +59,5 @@ export function LoginPage() {
       </form>
     </div>
   );
+}
 }
