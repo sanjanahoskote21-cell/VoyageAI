@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { registerUser } from '../api/authApi';
 import { getErrorMessage } from '../utils/getErrorMessage';
 
 function IconCheck() {
@@ -12,31 +13,19 @@ function IconCheck() {
 }
 
 const STEPS = [
-  {
-    title: 'Create your account',
-    desc: 'Just a few details to get you started.',
-  },
-  {
-    title: 'Meet your AI travel twin',
-    desc: 'It learns your style, pace, and budget.',
-  },
-  {
-    title: 'Get a personalized itinerary',
-    desc: 'Routes, stays, and stops — planned for you.',
-  },
-  {
-    title: 'Start exploring',
-    desc: 'Every journey tells a story. Yours starts now.',
-  },
+  { title: 'Create your account', desc: 'Just a few details to get you started.' },
+  { title: 'Meet your AI travel twin', desc: 'It learns your style, pace, and budget.' },
+  { title: 'Get a personalized itinerary', desc: 'Routes, stays, and stops — planned for you.' },
+  { title: 'Start exploring', desc: 'Every journey tells a story. Yours starts now.' },
 ];
 
 export function RegisterPage() {
-  const [name, setName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
-  const { register } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,7 +38,8 @@ export function RegisterPage() {
     }
 
     try {
-      await register({ name, email, password });
+      await registerUser({ email, password, full_name: fullName });
+      await login({ email, password });
       navigate('/dashboard');
     } catch (err) {
       setError(getErrorMessage(err));
@@ -60,7 +50,6 @@ export function RegisterPage() {
     <div className="min-h-screen bg-charcoal font-display flex items-center justify-center p-6">
       <div className="w-full max-w-4xl grid md:grid-cols-[1fr_1.1fr] rounded-2xl overflow-hidden border border-terracotta/20">
 
-        {/* Left: journey stepper panel */}
         <div className="hidden md:flex flex-col justify-center bg-terracotta/5 p-10 relative">
           <p className="text-2xl font-bold text-cream mb-1">Voyage<span className="text-terracotta">AI</span></p>
           <p className="text-cream/50 text-sm mb-10">Your AI Travel Companion</p>
@@ -72,9 +61,7 @@ export function RegisterPage() {
                   <div className="w-7 h-7 rounded-full border-2 border-terracotta flex items-center justify-center text-terracotta shrink-0 bg-charcoal z-10">
                     <IconCheck />
                   </div>
-                  {i < STEPS.length - 1 && (
-                    <div className="w-px flex-1 min-h-[36px] bg-terracotta/30" />
-                  )}
+                  {i < STEPS.length - 1 && <div className="w-px flex-1 min-h-[36px] bg-terracotta/30" />}
                 </div>
                 <div className="pb-8">
                   <p className="text-cream font-semibold text-sm">{step.title}</p>
@@ -85,7 +72,6 @@ export function RegisterPage() {
           </div>
         </div>
 
-        {/* Right: form */}
         <div className="bg-charcoal p-10">
           <h2 className="text-3xl font-bold text-cream mb-1">Create account</h2>
           <p className="text-cream/50 text-sm mb-8">Begin planning your next adventure</p>
@@ -96,8 +82,8 @@ export function RegisterPage() {
             <label className="block text-cream/70 text-sm font-medium mb-1">Full Name</label>
             <input
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
               required
               className="w-full bg-cream/5 text-cream rounded-lg px-3 py-2.5 mb-4 outline-none border border-cream/15 focus:border-terracotta transition font-sans"
             />
