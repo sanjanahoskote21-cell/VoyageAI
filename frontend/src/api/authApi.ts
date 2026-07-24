@@ -11,6 +11,15 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface ForgotPasswordPayload {
+  email: string;
+}
+
+export interface ResetPasswordPayload {
+  token: string;
+  new_password: string;
+}
+
 export interface UserResponse {
   id: string;
   email: string;
@@ -36,4 +45,12 @@ export const loginUser = async (data: LoginPayload): Promise<TokenResponse> => {
 export const getCurrentUser = async (): Promise<UserResponse> => {
   const response = await axiosClient.get<UserResponse>('/auth/me');
   return response.data;
+};
+
+export const forgotPassword = async (data: ForgotPasswordPayload): Promise<void> => {
+  await axiosClient.post('/auth/forgot-password', data);
+};
+
+export const resetPassword = async (data: ResetPasswordPayload): Promise<void> => {
+  await axiosClient.post('/auth/reset-password', data);
 };

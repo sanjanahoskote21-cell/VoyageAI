@@ -173,8 +173,13 @@ export function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="w-full bg-cream/5 text-cream rounded-lg px-3 py-2.5 mb-6 outline-none border border-cream/15 focus:border-terracotta transition font-sans"
+            className="w-full bg-cream/5 text-cream rounded-lg px-3 py-2.5 mb-2 outline-none border border-cream/15 focus:border-terracotta transition font-sans"
           />
+          <div className="text-right mb-6">
+            <Link to="/forgot-password" className="text-terracotta text-sm font-medium hover:underline">
+              Forgot password?
+            </Link>
+          </div>
 
           <button
             type="submit"
