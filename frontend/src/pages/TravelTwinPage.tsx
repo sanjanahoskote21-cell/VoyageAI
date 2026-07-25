@@ -55,6 +55,10 @@ export function TravelTwinPage() {
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap');
+        @keyframes typingDot {
+          0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+          30% { opacity: 1; transform: translateY(-2px); }
+        }
       `}</style>
 
       {/* Top bar */}
@@ -123,10 +127,20 @@ export function TravelTwinPage() {
 
           {isSending && (
             <div
-              className="p-3.5 rounded-xl max-w-[80%] text-[15px]"
-              style={{ background: "#FBF6EF", color: "#8B7A66", fontFamily: "Inter, sans-serif" }}
+              className="flex items-center gap-1.5 p-3.5 rounded-xl w-fit"
+              style={{ background: "#FBF6EF" }}
             >
-              Thinking...
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="block w-1.5 h-1.5 rounded-full"
+                  style={{
+                    background: "#8B7A66",
+                    animation: "typingDot 1.2s ease-in-out infinite",
+                    animationDelay: `${i * 0.15}s`,
+                  }}
+                />
+              ))}
             </div>
           )}
           <div ref={bottomRef} />
@@ -139,12 +153,14 @@ export function TravelTwinPage() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="Type a message..."
+            disabled={isSending}
             className="flex-1 px-3.5 py-2.5 rounded-lg text-[15px] outline-none focus:ring-2"
             style={{
               fontFamily: "Inter, sans-serif",
               background: "#F4EEE4",
               border: "1px solid #DDD0BE",
               color: "#241E1A",
+              opacity: isSending ? 0.6 : 1,
             }}
           />
           <button
