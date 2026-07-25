@@ -85,19 +85,23 @@ export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    try {
-      await login({ email, password });
-      navigate('/dashboard');
-    } catch (err) {
-      setError(getErrorMessage(err));
-    }
-  };
+  e.preventDefault();
+  setError('');
+  setIsSubmitting(true);
+  try {
+    await login({ email, password });
+    navigate('/dashboard');
+  } catch (err) {
+    setError(getErrorMessage(err));
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-charcoal font-display flex items-center p-6">
@@ -182,11 +186,12 @@ export function LoginPage() {
           </div>
 
           <button
-            type="submit"
-            className="w-full bg-terracotta hover:bg-terracotta/90 text-cream font-semibold rounded-lg py-3 transition"
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full bg-terracotta hover:bg-terracotta/90 text-cream font-semibold rounded-lg py-3 transition disabled:opacity-60"
           >
-            Continue Journey
-          </button>
+            {isSubmitting ? "Signing in..." : "Continue Journey"}
+            </button>
 
           <p className="text-cream/50 text-sm mt-6 text-center font-sans">
             No account? <Link to="/register" className="text-terracotta font-semibold hover:underline">Register</Link>
