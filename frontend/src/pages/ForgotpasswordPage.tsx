@@ -15,6 +15,7 @@ export function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [resetLink, setResetLink] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -24,7 +25,8 @@ export function ForgotPasswordPage() {
     setSubmitting(true);
     setError("");
     try {
-      await forgotPassword({ email });
+      const { reset_link } = await forgotPassword({ email });
+      setResetLink(reset_link ?? null);
       setSubmitted(true);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -127,12 +129,33 @@ export function ForgotPasswordPage() {
               Check your email
             </h1>
             <p
-              className="text-sm mb-6"
+              className="text-sm mb-4"
               style={{ color: "#8B7A66", fontFamily: "Inter, sans-serif" }}
             >
               If an account exists for <strong>{email}</strong>, a reset link is on its
               way.
             </p>
+
+            {resetLink && (
+              <div
+                className="rounded-lg p-4 mb-2"
+                style={{ background: "#F4EEE4", border: "1px dashed #DDD0BE" }}
+              >
+                <p
+                  className="text-[11px] uppercase tracking-[0.1em] mb-2"
+                  style={{ color: "#A99C8C", fontFamily: "Inter, sans-serif" }}
+                >
+                  Dev mode — link shown here instead of emailed
+                </p>
+                <a
+                  href={resetLink}
+                  className="text-sm break-all"
+                  style={{ color: "#C9683F", fontFamily: "Inter, sans-serif" }}
+                >
+                  {resetLink}
+                </a>
+              </div>
+            )}
           </>
         )}
 
