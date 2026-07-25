@@ -9,6 +9,8 @@ settings = get_settings()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+PASSWORD_RESET_EXPIRE_MINUTES = 15
+
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
@@ -32,6 +34,32 @@ def decode_access_token(token: str) -> str | None:
     """
     try:
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        return payload.get("sub")
+    except JWTError:
+        return None
+
+
+def create_password_reset_token(user_id: str) -> str:
+    """
+    Short-lived token (15 min) scoped only for password resets — it carries
+    a 'scope' claim so it can never be accepted by the normal auth dependency
+    even though it's signed with the same secret.
+    """
+    expire = datetime.now(timezone.utc) + timedelta(minutes=PASSWORD_RESET_EXPIRE_MINUTES)
+    payload = {"sub": user_id, "exp": expire, "scope": "password_reset"}
+    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+
+def decode_password_reset_token(token: str) -> str | None:
+    """
+    Returns the user_id if the token is valid, unexpired, and scoped for
+    password resets. Returns None otherwise (invalid, expired, or a
+    regular access token being reused here).
+    """
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        if payload.get("scope") != "password_reset":
+            return None
         return payload.get("sub")
     except JWTError:
         return None

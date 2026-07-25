@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     # App
     APP_NAME: str = "VoyageAI"
     ENVIRONMENT: str = "development"
+    FRONTEND_URL: str = "http://localhost:5173"
 
     # Database
     DATABASE_URL: str
