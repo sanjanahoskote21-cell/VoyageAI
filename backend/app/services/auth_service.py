@@ -13,6 +13,7 @@ from app.core.security import (
     decode_password_reset_token,
 )
 from app.core.config import get_settings
+from app.services.email_service import send_password_reset_email
 
 settings = get_settings()
 
@@ -54,10 +55,13 @@ def request_password_reset(db: Session, email: str) -> str | None:
     prevents attackers from using this endpoint to discover which emails
     are registered.
 
-    Returns the reset link ONLY when ENVIRONMENT=development, so it can be
-    tested without a real email service. In any other environment this
-    always returns None — the link is only ever logged server-side, never
-    handed back to the client.
+    Tries to send the reset link by real email first. Returns the link
+    back to the caller ONLY when:
+      - ENVIRONMENT=development, AND
+      - the email send failed or SMTP isn't configured
+    so local testing still works without SMTP set up. In any other case
+    (production, or the email sent successfully) this returns None — the
+    link is never handed back to the client once it's actually emailed.
     """
     user = db.query(User).filter(User.email == email).first()
     if not user:
@@ -66,11 +70,13 @@ def request_password_reset(db: Session, email: str) -> str | None:
     token = create_password_reset_token(str(user.id))
     reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
 
-    # TODO: replace with a real email service (SendGrid/SMTP) later.
-    print(f"[password reset] link for {email}: {reset_link}")
+    email_sent = send_password_reset_email(email, reset_link)
 
-    if settings.ENVIRONMENT == "development":
-        return reset_link
+    if not email_sent:
+        print(f"[password reset] link for {email}: {reset_link}")
+        if settings.ENVIRONMENT == "development":
+            return reset_link
+
     return None
 
 
