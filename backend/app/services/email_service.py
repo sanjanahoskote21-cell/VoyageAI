@@ -48,3 +48,16 @@ def send_password_reset_email(to_email: str, reset_link: str) -> bool:
         f"— VoyageAI"
     )
     return send_email(to_email, subject, body)
+
+
+def send_verification_email(to_email: str, verify_link: str) -> bool:
+    subject = "Verify your VoyageAI email"
+    body = (
+        f"Hi,\n\n"
+        f"Thanks for signing up for VoyageAI! Please verify your email to "
+        f"activate your account — this link expires in 24 hours:\n\n"
+        f"{verify_link}\n\n"
+        f"If you didn't create this account, you can safely ignore this email.\n\n"
+        f"— VoyageAI"
+    )
+    return send_email(to_email, subject, body)

@@ -3,6 +3,7 @@ import { LoginPage } from '../pages/LoginPage';
 import RegisterPage from '../pages/RegisterPage';
 import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '../pages/ResetPasswordPage';
+import { VerifyEmailPage } from '../pages/VerifyEmailPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { TripPlannerPage } from '../pages/TripPlannerPage';
 import { ItineraryPage } from '../pages/ItineraryPage';
@@ -16,6 +17,7 @@ export function AppRoutes() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
       <Route

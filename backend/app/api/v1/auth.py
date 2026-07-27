@@ -12,12 +12,17 @@ from app.schemas.user import (
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     ResetPasswordRequest,
+    VerifyEmailRequest,
+    ResendVerificationRequest,
+    ResendVerificationResponse,
 )
 from app.services.auth_service import (
     register_user,
     authenticate_user,
     request_password_reset,
     reset_password,
+    verify_email,
+    resend_verification_email,
 )
 from app.core.dependencies import get_current_user
 from app.models.user import User
@@ -54,3 +59,18 @@ def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
 def reset_password_endpoint(data: ResetPasswordRequest, db: Session = Depends(get_db)):
     reset_password(db, data.token, data.new_password)
     return None
+
+
+@router.post("/verify-email", status_code=204)
+def verify_email_endpoint(data: VerifyEmailRequest, db: Session = Depends(get_db)):
+    verify_email(db, data.token)
+    return None
+
+
+@router.post("/resend-verification", response_model=ResendVerificationResponse)
+def resend_verification_endpoint(data: ResendVerificationRequest, db: Session = Depends(get_db)):
+    verify_link = resend_verification_email(db, data.email)
+    return ResendVerificationResponse(
+        message="If an unverified account exists for this email, a new link has been sent.",
+        verify_link=verify_link,
+    )

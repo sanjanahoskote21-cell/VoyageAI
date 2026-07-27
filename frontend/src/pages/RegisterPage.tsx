@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Check, Eye, EyeOff, ArrowRight, ArrowLeft, MapPin } from "lucide-react";
-import { useAuth } from "../hooks/useAuth";
 import { registerUser } from "../api/authApi";
 import { getErrorMessage } from "../utils/getErrorMessage";
 
@@ -140,8 +139,6 @@ const inputBase = {
 };
 
 export default function RegisterPage() {
-  const navigate = useNavigate();
-  const { login } = useAuth();
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -151,6 +148,7 @@ export default function RegisterPage() {
   const [touched, setTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [registered, setRegistered] = useState(false);
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const nameValid = name.trim().length > 1;
@@ -167,8 +165,7 @@ export default function RegisterPage() {
     setError("");
     try {
       await registerUser({ email, password, full_name: name });
-      await login({ email, password });
-      navigate("/dashboard");
+      setRegistered(true);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -209,35 +206,71 @@ export default function RegisterPage() {
           </span>
         </div>
 
-        <h1
-          className="text-[28px] leading-tight mb-1.5"
-          style={{
-            fontFamily: "Fraunces, serif",
-            fontWeight: 500,
-            color: "#241E1A",
-          }}
-        >
-          {step === 1 ? "Start your journey" : "Secure your account"}
-        </h1>
-        <p
-          className="text-sm mb-6"
-          style={{ color: "#8B7A66", fontFamily: "Inter, sans-serif" }}
-        >
-          {step === 1
-            ? "Plan your first trip with your Travel Twin."
-            : "One last step before your first itinerary."}
-        </p>
-
-        {/* Progress */}
-        <div className="flex gap-1.5 mb-7">
-          {[1, 2].map((s) => (
+        {registered ? (
+          <>
             <div
-              key={s}
-              className="h-[3px] flex-1 rounded-full transition-colors duration-300"
-              style={{ background: s <= step ? "#C9683F" : "#E5DAC8" }}
-            />
-          ))}
-        </div>
+              className="w-12 h-12 rounded-full flex items-center justify-center mb-5"
+              style={{ background: "#EFE6D8" }}
+            >
+              <Check size={20} color="#3F8F5F" />
+            </div>
+            <h1
+              className="text-[26px] leading-tight mb-2"
+              style={{ fontFamily: "Fraunces, serif", fontWeight: 500, color: "#241E1A" }}
+            >
+              Check your email
+            </h1>
+            <p
+              className="text-sm mb-6"
+              style={{ color: "#8B7A66", fontFamily: "Inter, sans-serif" }}
+            >
+              We sent a verification link to <strong>{email}</strong>. Click it to
+              activate your account, then come back and log in.
+            </p>
+            <Link
+              to="/login"
+              className="inline-block px-5 py-2.5 rounded-lg text-[15px] font-medium"
+              style={{
+                background: "#C9683F",
+                color: "#FBF6EF",
+                fontFamily: "Inter, sans-serif",
+                textDecoration: "none",
+              }}
+            >
+              Go to log in
+            </Link>
+          </>
+        ) : (
+          <>
+            <h1
+              className="text-[28px] leading-tight mb-1.5"
+              style={{
+                fontFamily: "Fraunces, serif",
+                fontWeight: 500,
+                color: "#241E1A",
+              }}
+            >
+              {step === 1 ? "Start your journey" : "Secure your account"}
+            </h1>
+            <p
+              className="text-sm mb-6"
+              style={{ color: "#8B7A66", fontFamily: "Inter, sans-serif" }}
+            >
+              {step === 1
+                ? "Plan your first trip with your Travel Twin."
+                : "One last step before your first itinerary."}
+            </p>
+
+            {/* Progress */}
+            <div className="flex gap-1.5 mb-7">
+              {[1, 2].map((s) => (
+                <div
+                  key={s}
+                  className="h-[3px] flex-1 rounded-full transition-colors duration-300"
+                  style={{ background: s <= step ? "#C9683F" : "#E5DAC8" }}
+                />
+              ))}
+            </div>
 
         {step === 1 && (
           <div>
@@ -414,16 +447,20 @@ export default function RegisterPage() {
             </div>
           </div>
         )}
+          </>
+        )}
 
-        <p
-          className="text-center text-sm mt-6"
-          style={{ color: "#A99C8C", fontFamily: "Inter, sans-serif" }}
-        >
-          Already have an account?{" "}
-          <Link to="/login" style={{ color: "#C9683F" }}>
-            Log in
-          </Link>
-        </p>
+        {!registered && (
+          <p
+            className="text-center text-sm mt-6"
+            style={{ color: "#A99C8C", fontFamily: "Inter, sans-serif" }}
+          >
+            Already have an account?{" "}
+            <Link to="/login" style={{ color: "#C9683F" }}>
+              Log in
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   );
