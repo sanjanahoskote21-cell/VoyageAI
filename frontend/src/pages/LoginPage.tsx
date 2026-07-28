@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { getErrorMessage } from '../utils/getErrorMessage';
+import { resendVerification } from '../api/authApi';
 
 function IconRoute() {
   return (
@@ -86,22 +87,42 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notVerified, setNotVerified] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendSent, setResendSent] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setError('');
-  setIsSubmitting(true);
-  try {
-    await login({ email, password });
-    navigate('/dashboard');
-  } catch (err) {
-    setError(getErrorMessage(err));
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+    e.preventDefault();
+    setError('');
+    setNotVerified(false);
+    setResendSent(false);
+    setIsSubmitting(true);
+    try {
+      await login({ email, password });
+      navigate('/dashboard');
+    } catch (err) {
+      setError(getErrorMessage(err));
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 403) {
+        setNotVerified(true);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (!email.trim() || resending) return;
+    setResending(true);
+    try {
+      await resendVerification(email);
+      setResendSent(true);
+    } finally {
+      setResending(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-charcoal font-display flex items-center p-6">
@@ -160,7 +181,24 @@ export function LoginPage() {
           <h2 className="text-3xl font-bold text-cream mb-1">Welcome back</h2>
           <p className="text-cream/50 text-sm mb-8">Log in to continue your journey</p>
 
-          {error && <p className="text-terracotta text-sm mb-4 font-medium">{error}</p>}
+          {error && <p className="text-terracotta text-sm mb-2 font-medium">{error}</p>}
+
+          {notVerified && !resendSent && (
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={resending}
+              className="text-terracotta text-sm font-medium hover:underline mb-4 disabled:opacity-60"
+            >
+              {resending ? "Sending..." : "Resend verification email"}
+            </button>
+          )}
+
+          {resendSent && (
+            <p className="text-cream/60 text-sm mb-4">
+              Verification email sent — check your inbox.
+            </p>
+          )}
 
           <label className="block text-cream/70 text-sm font-medium mb-1">Email</label>
           <input
