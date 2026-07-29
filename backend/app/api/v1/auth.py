@@ -1,9 +1,10 @@
 # app/api/v1/auth.py
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.core.limiter import limiter
 from app.schemas.user import (
     UserCreate,
     UserLogin,
@@ -31,12 +32,14 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/register", response_model=UserResponse, status_code=201)
-def register(user_data: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register(request: Request, user_data: UserCreate, db: Session = Depends(get_db)):
     return register_user(db, user_data)
 
 
 @router.post("/login", response_model=Token)
-def login(credentials: UserLogin, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, credentials: UserLogin, db: Session = Depends(get_db)):
     access_token = authenticate_user(db, credentials)
     return Token(access_token=access_token)
 
@@ -47,7 +50,8 @@ def get_me(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
-def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
+@limiter.limit("3/minute")
+def forgot_password(request: Request, data: ForgotPasswordRequest, db: Session = Depends(get_db)):
     reset_link = request_password_reset(db, data.email)
     return ForgotPasswordResponse(
         message="If an account exists for this email, a reset link has been sent.",
@@ -56,19 +60,22 @@ def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/reset-password", status_code=204)
-def reset_password_endpoint(data: ResetPasswordRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def reset_password_endpoint(request: Request, data: ResetPasswordRequest, db: Session = Depends(get_db)):
     reset_password(db, data.token, data.new_password)
     return None
 
 
 @router.post("/verify-email", status_code=204)
-def verify_email_endpoint(data: VerifyEmailRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def verify_email_endpoint(request: Request, data: VerifyEmailRequest, db: Session = Depends(get_db)):
     verify_email(db, data.token)
     return None
 
 
 @router.post("/resend-verification", response_model=ResendVerificationResponse)
-def resend_verification_endpoint(data: ResendVerificationRequest, db: Session = Depends(get_db)):
+@limiter.limit("3/minute")
+def resend_verification_endpoint(request: Request, data: ResendVerificationRequest, db: Session = Depends(get_db)):
     verify_link = resend_verification_email(db, data.email)
     return ResendVerificationResponse(
         message="If an unverified account exists for this email, a new link has been sent.",
