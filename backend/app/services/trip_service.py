@@ -1,4 +1,5 @@
 # app/services/trip_service.py
+import httpx
 
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
@@ -12,8 +13,59 @@ from app.services.route_optimizer import optimize_route, Point
 from app.services.budget_service import calculate_budget
 
 
-def geocode_place_name(name: str, city: str | None) -> tuple[float, float]:
-    raise NotImplementedError("Geocoding not yet implemented")
+NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+
+def geocode_place_name(place_name: str, city_hint: str | None = None) -> tuple[float, float, str]:
+    """Returns (latitude, longitude, city_guess) for a free-text place name.
+    city_hint improves search accuracy when you already know the city."""
+    headers = {"User-Agent": "VoyageAI-TravelPlanner/1.0"}
+    query = f"{place_name}, {city_hint}" if city_hint else place_name
+    params = {
+        "q": query,
+        "format": "jsonv2",
+        "limit": 1,
+        "countrycodes": "in",
+        "addressdetails": 1,
+    }
+
+    response = httpx.get(NOMINATIM_URL, params=params, headers=headers, timeout=10)
+    response.raise_for_status()
+    results = response.json()
+
+    if not results:
+        raise ValueError(f"Could not find location: {place_name}")
+
+    result = results[0]
+    address = result.get("address", {})
+    city = (
+        city_hint
+        or address.get("city")
+        or address.get("town")
+        or address.get("village")
+        or address.get("county")
+        or address.get("state_district")
+        or "Unknown"
+    )
+
+    return float(result["lat"]), float(result["lon"]), city
+
+
+def add_custom_place(place_name: str, db: Session) -> Place:
+    lat, lon, city = geocode_place_name(place_name)
+
+    place = Place(
+        name=place_name,
+        latitude=lat,
+        longitude=lon,
+        city=city,
+        category="custom",
+        avg_rating=None,
+        source="user_added",
+    )
+    db.add(place)
+    db.commit()
+    db.refresh(place)
+    return place
 
 
 def _sorted_places(trip: Trip) -> Trip:
@@ -22,6 +74,15 @@ def _sorted_places(trip: Trip) -> Trip:
 
 
 def create_trip(db: Session, user: User, trip_data: TripCreate) -> Trip:
+    # Geocode the trip's actual start location up front — this was the missing piece.
+    try:
+        start_lat, start_lon, _ = geocode_place_name(trip_data.start_location)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Could not find location: {trip_data.start_location}",
+        )
+
     new_trip = Trip(
         user_id=user.id,
         start_location=trip_data.start_location,
@@ -46,7 +107,7 @@ def create_trip(db: Session, user: User, trip_data: TripCreate) -> Trip:
             trip_place = TripPlace(trip_id=new_trip.id, place_id=place.id)
 
         elif place_input.custom_name:
-            latitude, longitude = geocode_place_name(
+            latitude, longitude, _ = geocode_place_name(
                 place_input.custom_name, place_input.custom_city
             )
             trip_place = TripPlace(
@@ -68,6 +129,9 @@ def create_trip(db: Session, user: User, trip_data: TripCreate) -> Trip:
     db.flush()
 
     # --- Route optimization ---
+    # Start point now comes from the trip's real start_location, not the first added place.
+    start_point = Point(id="start", latitude=start_lat, longitude=start_lon)
+
     points = []
     for tp in trip_places:
         if tp.place_id:
@@ -76,22 +140,16 @@ def create_trip(db: Session, user: User, trip_data: TripCreate) -> Trip:
         else:
             points.append(Point(id=str(tp.id), latitude=tp.latitude, longitude=tp.longitude))
 
-    if len(points) >= 2:
-        start_point, remaining_points = points[0], points[1:]
-        result = optimize_route(start_point, remaining_points)
+    if points:
+        result = optimize_route(start_point, points)
 
         visit_order_map = {pid: i + 1 for i, pid in enumerate(result["ordered_place_ids"])}
         for tp in trip_places:
             if str(tp.id) in visit_order_map:
                 tp.visit_order = visit_order_map[str(tp.id)]
-            elif str(tp.id) == start_point.id:
-                tp.visit_order = 0
 
         new_trip.total_distance_km = result["optimized_distance_km"]
         new_trip.distance_saved_km = result["distance_saved_km"]
-
-    elif len(points) == 1:
-        trip_places[0].visit_order = 0
 
     # --- Budget calculation ---
     trip_cities = list({tp.display_city for tp in trip_places if tp.display_city})
