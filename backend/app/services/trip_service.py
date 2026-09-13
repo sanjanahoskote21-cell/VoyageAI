@@ -49,25 +49,6 @@ def geocode_place_name(place_name: str, city_hint: str | None = None) -> tuple[f
 
     return float(result["lat"]), float(result["lon"]), city
 
-
-def add_custom_place(place_name: str, db: Session) -> Place:
-    lat, lon, city = geocode_place_name(place_name)
-
-    place = Place(
-        name=place_name,
-        latitude=lat,
-        longitude=lon,
-        city=city,
-        category="custom",
-        avg_rating=None,
-        source="user_added",
-    )
-    db.add(place)
-    db.commit()
-    db.refresh(place)
-    return place
-
-
 def _sorted_places(trip: Trip) -> Trip:
     trip.trip_places.sort(key=lambda tp: (tp.visit_order is None, tp.visit_order))
     return trip
