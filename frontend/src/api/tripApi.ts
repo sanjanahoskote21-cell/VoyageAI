@@ -48,6 +48,20 @@ export interface TripResponse {
   budget?: BudgetEstimateResponse;
 }
 
+export interface RecommendedPlace {
+  id: string;
+  name: string;
+  category: string;
+  city: string;
+  avg_rating: number | null;
+  latitude: number;
+  longitude: number;
+  final_score: number;
+  rating_score: number;
+  category_score: number;
+  proximity_score: number;
+}
+
 export const createTrip = async (data: TripCreatePayload): Promise<TripResponse> => {
   const response = await axiosClient.post<TripResponse>('/trips/', data);
   return response.data;
@@ -61,4 +75,18 @@ export const getTrip = async (tripId: string): Promise<TripResponse> => {
 export const listMyTrips = async (): Promise<TripResponse[]> => {
   const response = await axiosClient.get<TripResponse[]>('/trips/');
   return response.data;
+};
+
+export const getRecommendations = async (tripId: string): Promise<RecommendedPlace[]> => {
+  const response = await axiosClient.get<RecommendedPlace[]>(`/trips/${tripId}/recommendations`);
+  return response.data;
+};
+
+export const addPlaceToTrip = async (tripId: string, placeId: string): Promise<TripPlaceResponse> => {
+  const response = await axiosClient.post<TripPlaceResponse>(`/trips/${tripId}/places/${placeId}`);
+  return response.data;
+};
+
+export const removePlaceFromTrip = async (tripId: string, tripPlaceId: string): Promise<void> => {
+  await axiosClient.delete(`/trips/${tripId}/places/${tripPlaceId}`);
 };

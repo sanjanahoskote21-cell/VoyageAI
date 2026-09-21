@@ -4,17 +4,18 @@ Travel Twin - AI trip companion chat, using context-stuffing (Option A):
 fetch trip data once per request, build one prompt, call Gemini.
 """
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+
 from app.core.config import get_settings
 from app.models.trip import Trip
 from app.models.chat_message import ChatMessage
 
 settings = get_settings()
-genai.configure(api_key=settings.GEMINI_API_KEY)
+client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
-MODEL_NAME = "gemini-flash-latest"  # fast + free-tier friendly; swap easily if needed
+MODEL_NAME = "gemini-3.6-flash"  # versioned, stable - avoids the broken "-latest" alias
 CHAT_HISTORY_LIMIT = 10  # only send the last N messages, keeps prompt size bounded
 
 
@@ -62,8 +63,8 @@ Route:
 """.strip()
 
 
-def get_recent_chat_history(db: Session, trip_id) -> list[dict]:
-    """Fetches the last N messages for this trip, oldest first, in Gemini's expected format."""
+def get_recent_chat_history(db: Session, trip_id) -> list[types.Content]:
+    """Fetches the last N messages for this trip, oldest first, in the SDK's expected format."""
     messages = (
         db.query(ChatMessage)
         .filter(ChatMessage.trip_id == trip_id)
@@ -74,7 +75,10 @@ def get_recent_chat_history(db: Session, trip_id) -> list[dict]:
     messages.reverse()  # oldest first for correct conversation order
 
     return [
-        {"role": "user" if m.role == "user" else "model", "parts": [m.content]}
+        types.Content(
+            role="user" if m.role == "user" else "model",
+            parts=[types.Part(text=m.content)],
+        )
         for m in messages
     ]
 
@@ -90,10 +94,13 @@ def send_message(db: Session, trip: Trip, user_message: str) -> str:
         "aren't in the context.\n\n" + build_trip_context(trip)
     )
 
-    model = genai.GenerativeModel(MODEL_NAME, system_instruction=system_prompt)
-
     history = get_recent_chat_history(db, trip.id)
-    chat = model.start_chat(history=history)
+
+    chat = client.chats.create(
+        model=MODEL_NAME,
+        history=history,
+        config=types.GenerateContentConfig(system_instruction=system_prompt),
+    )
 
     response = chat.send_message(user_message)
     ai_reply = response.text

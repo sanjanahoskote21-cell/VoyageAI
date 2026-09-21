@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   MapPin,
@@ -9,8 +10,16 @@ import {
   TrendingDown,
   Compass,
   MessageCircle,
+  Star,
+  Plus,
+  X,
 } from "lucide-react";
-import { getTrip } from "../api/tripApi";
+import {
+  getTrip,
+  getRecommendations,
+  addPlaceToTrip,
+  removePlaceFromTrip,
+} from "../api/tripApi";
 
 // ─────────────────────────────────────────────────────────────
 // VoyageAI — ItineraryPage
@@ -53,6 +62,13 @@ function StatusScreen({ children }: { children: React.ReactNode }) {
 
 export function ItineraryPage() {
   const { tripId } = useParams<{ tripId: string }>();
+  const queryClient = useQueryClient();
+
+  const [addingId, setAddingId] = useState<string | null>(null);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+
   const {
     data: trip,
     isLoading,
@@ -61,6 +77,48 @@ export function ItineraryPage() {
     queryKey: ["trip", tripId],
     queryFn: () => getTrip(tripId!),
     enabled: !!tripId,
+  });
+
+  const { data: recommendations } = useQuery({
+    queryKey: ["recommendations", tripId],
+    queryFn: () => getRecommendations(tripId!),
+    enabled: !!tripId,
+  });
+
+  const addPlaceMutation = useMutation({
+    mutationFn: (placeId: string) => addPlaceToTrip(tripId!, placeId),
+    onMutate: (placeId) => {
+      setAddingId(placeId);
+      setAddError(null);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["trip", tripId] });
+      queryClient.invalidateQueries({ queryKey: ["recommendations", tripId] });
+    },
+    onError: () => {
+      setAddError("Couldn't add that place. Try again.");
+    },
+    onSettled: () => {
+      setAddingId(null);
+    },
+  });
+
+  const removePlaceMutation = useMutation({
+    mutationFn: (tripPlaceId: string) => removePlaceFromTrip(tripId!, tripPlaceId),
+    onMutate: (tripPlaceId) => {
+      setRemovingId(tripPlaceId);
+      setRemoveError(null);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["trip", tripId] });
+      queryClient.invalidateQueries({ queryKey: ["recommendations", tripId] });
+    },
+    onError: () => {
+      setRemoveError("Couldn't remove that place. Try again.");
+    },
+    onSettled: () => {
+      setRemovingId(null);
+    },
   });
 
   if (isLoading) return <StatusScreen>Loading your itinerary...</StatusScreen>;
@@ -158,6 +216,14 @@ export function ItineraryPage() {
         >
           Places
         </h2>
+        {removeError && (
+          <p
+            className="text-sm mb-2"
+            style={{ color: "#E3A876", fontFamily: "Inter, sans-serif" }}
+          >
+            {removeError}
+          </p>
+        )}
         <div className="grid gap-2 mb-8">
           {orderedPlaces.map((place, i) => (
             <div
@@ -171,7 +237,7 @@ export function ItineraryPage() {
               >
                 {i + 1}
               </span>
-              <div>
+              <div className="min-w-0 flex-1">
                 <p
                   className="text-[15px] font-medium"
                   style={{ color: "#241E1A", fontFamily: "Inter, sans-serif" }}
@@ -187,9 +253,98 @@ export function ItineraryPage() {
                   </p>
                 )}
               </div>
+              <button
+                onClick={() => removePlaceMutation.mutate(place.id)}
+                disabled={removingId === place.id}
+                title="Remove from trip"
+                className="flex shrink-0 items-center justify-center w-7 h-7 rounded-full"
+                style={{
+                  background: "transparent",
+                  color: removingId === place.id ? "#D8CBB8" : "#8B7A66",
+                  border: "none",
+                  cursor: removingId === place.id ? "default" : "pointer",
+                }}
+              >
+                <X size={15} />
+              </button>
             </div>
           ))}
         </div>
+
+        {/* Recommended for you */}
+        {recommendations && recommendations.length > 0 && (
+          <>
+            <h2
+              className="text-lg mb-3"
+              style={{ fontFamily: "Fraunces, serif", fontWeight: 500, color: "#F4EEE4" }}
+            >
+              Recommended for you
+            </h2>
+            {addError && (
+              <p
+                className="text-sm mb-2"
+                style={{ color: "#E3A876", fontFamily: "Inter, sans-serif" }}
+              >
+                {addError}
+              </p>
+            )}
+            <div className="grid gap-2 mb-8">
+              {recommendations.map((rec) => (
+                <div
+                  key={rec.id}
+                  className="flex items-center gap-3 rounded-xl px-4 py-3"
+                  style={{ background: "#FBF6EF" }}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="text-[15px] font-medium"
+                      style={{ color: "#241E1A", fontFamily: "Inter, sans-serif" }}
+                    >
+                      {rec.name}
+                    </p>
+                    <div
+                      className="flex items-center gap-2 text-sm"
+                      style={{ color: "#8B7A66", fontFamily: "Inter, sans-serif" }}
+                    >
+                      <span>{rec.city}</span>
+                      <span>·</span>
+                      <span className="capitalize">{rec.category}</span>
+                      {rec.avg_rating != null && (
+                        <>
+                          <span>·</span>
+                          <span className="flex items-center gap-0.5">
+                            <Star size={12} fill="#E3A876" color="#E3A876" />
+                            {rec.avg_rating.toFixed(1)}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => addPlaceMutation.mutate(rec.id)}
+                    disabled={addingId === rec.id}
+                    className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium"
+                    style={{
+                      background: addingId === rec.id ? "#EFE6D8" : "#C9683F",
+                      color: addingId === rec.id ? "#8B7A66" : "#FBF6EF",
+                      fontFamily: "Inter, sans-serif",
+                      border: "none",
+                      cursor: addingId === rec.id ? "default" : "pointer",
+                    }}
+                  >
+                    {addingId === rec.id ? (
+                      "Adding..."
+                    ) : (
+                      <>
+                        <Plus size={14} /> Add
+                      </>
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Budget */}
         {trip.budget && (

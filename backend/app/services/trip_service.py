@@ -49,9 +49,72 @@ def geocode_place_name(place_name: str, city_hint: str | None = None) -> tuple[f
 
     return float(result["lat"]), float(result["lon"]), city
 
+
 def _sorted_places(trip: Trip) -> Trip:
     trip.trip_places.sort(key=lambda tp: (tp.visit_order is None, tp.visit_order))
     return trip
+
+
+def recalculate_trip(db: Session, trip: Trip) -> None:
+    """Recomputes route optimization (visit_order, total/saved distance) and the
+    budget estimate for a trip. Call this any time a trip's places change after
+    creation — adding or removing a place — so distance/budget don't go stale."""
+    try:
+        start_lat, start_lon, _ = geocode_place_name(trip.start_location)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Could not find location: {trip.start_location}",
+        )
+
+    trip_places = db.query(TripPlace).filter(TripPlace.trip_id == trip.id).all()
+
+    if trip_places:
+        start_point = Point(id="start", latitude=start_lat, longitude=start_lon)
+        points = [
+            Point(id=str(tp.id), latitude=tp.resolved_latitude, longitude=tp.resolved_longitude)
+            for tp in trip_places
+        ]
+        result = optimize_route(start_point, points)
+
+        visit_order_map = {pid: i + 1 for i, pid in enumerate(result["ordered_place_ids"])}
+        for tp in trip_places:
+            tp.visit_order = visit_order_map.get(str(tp.id))
+
+        trip.total_distance_km = result["optimized_distance_km"]
+        trip.distance_saved_km = result["distance_saved_km"]
+    else:
+        trip.total_distance_km = None
+        trip.distance_saved_km = None
+
+    trip_cities = list({tp.display_city for tp in trip_places if tp.display_city})
+    budget_result = calculate_budget(
+        db=db,
+        cities=trip_cities,
+        budget_tier=trip.budget_tier,
+        num_days=trip.num_days,
+        num_travelers=trip.num_travelers,
+        total_distance_km=trip.total_distance_km or 0,
+        travel_mode=trip.travel_mode,
+    )
+
+    if trip.budget_estimate:
+        trip.budget_estimate.hotel_cost = budget_result["hotel_cost"]
+        trip.budget_estimate.food_cost = budget_result["food_cost"]
+        trip.budget_estimate.fuel_cost = budget_result["fuel_cost"]
+        trip.budget_estimate.misc_cost = budget_result["misc_cost"]
+        trip.budget_estimate.total_cost = budget_result["total_cost"]
+    else:
+        db.add(BudgetEstimate(
+            trip_id=trip.id,
+            hotel_cost=budget_result["hotel_cost"],
+            food_cost=budget_result["food_cost"],
+            fuel_cost=budget_result["fuel_cost"],
+            misc_cost=budget_result["misc_cost"],
+            total_cost=budget_result["total_cost"],
+        ))
+
+    db.commit()
 
 
 def create_trip(db: Session, user: User, trip_data: TripCreate) -> Trip:

@@ -9,8 +9,15 @@ from app.db.session import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.models.trip import Trip, TripPlace
+from app.models.place import Place
 from app.schemas.trip import TripCreate, TripResponse, TripPlaceResponse
-from app.services.trip_service import create_trip, get_trip, list_user_trips, geocode_place_name
+from app.services.trip_service import (
+    create_trip,
+    get_trip,
+    list_user_trips,
+    geocode_place_name,
+    recalculate_trip,
+)
 from app.services.recommendation_service import get_recommendations
 from app.schemas.recommendation import RecommendedPlace
 
@@ -51,7 +58,64 @@ def add_custom_place_to_trip(
     db.add(trip_place)
     db.commit()
     db.refresh(trip_place)
+
+    recalculate_trip(db, trip)
+    db.refresh(trip_place)
+
     return trip_place
+
+
+@router.post("/{trip_id}/places/{place_id}", response_model=TripPlaceResponse)
+def add_place_to_trip(
+    trip_id: UUID,
+    place_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    trip = db.query(Trip).filter(Trip.id == trip_id, Trip.user_id == current_user.id).first()
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found.")
+
+    place = db.query(Place).filter(Place.id == place_id).first()
+    if not place:
+        raise HTTPException(status_code=404, detail="Place not found.")
+
+    trip_place = TripPlace(trip_id=trip_id, place_id=place.id)
+    db.add(trip_place)
+    db.commit()
+    db.refresh(trip_place)
+
+    recalculate_trip(db, trip)
+    db.refresh(trip_place)
+
+    return trip_place
+
+
+@router.delete("/{trip_id}/places/{trip_place_id}", status_code=204)
+def remove_place_from_trip(
+    trip_id: UUID,
+    trip_place_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    trip = db.query(Trip).filter(Trip.id == trip_id, Trip.user_id == current_user.id).first()
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found.")
+
+    trip_place = (
+        db.query(TripPlace)
+        .filter(TripPlace.id == trip_place_id, TripPlace.trip_id == trip_id)
+        .first()
+    )
+    if not trip_place:
+        raise HTTPException(status_code=404, detail="Place not found on this trip.")
+
+    db.delete(trip_place)
+    db.commit()
+
+    recalculate_trip(db, trip)
+
+    return None
 
 
 @router.get("/{trip_id}/recommendations", response_model=list[RecommendedPlace])
