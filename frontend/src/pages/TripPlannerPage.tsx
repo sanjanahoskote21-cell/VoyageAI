@@ -53,6 +53,10 @@ export function TripPlannerPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<PlaceResponse[]>([]);
   const [selectedPlaces, setSelectedPlaces] = useState<PlaceResponse[]>([]);
+
+  const [customPlaceName, setCustomPlaceName] = useState("");
+  const [customPlaces, setCustomPlaces] = useState<string[]>([]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -72,8 +76,21 @@ export function TripPlannerPage() {
     setSelectedPlaces((prev) => prev.filter((p) => p.id !== placeId));
   };
 
+  const addCustomPlace = () => {
+    const name = customPlaceName.trim();
+    if (!name) return;
+    if (!customPlaces.some((p) => p.toLowerCase() === name.toLowerCase())) {
+      setCustomPlaces((prev) => [...prev, name]);
+    }
+    setCustomPlaceName("");
+  };
+
+  const removeCustomPlace = (name: string) => {
+    setCustomPlaces((prev) => prev.filter((p) => p !== name));
+  };
+
   const handleSubmit = async () => {
-    if (selectedPlaces.length === 0) {
+    if (selectedPlaces.length === 0 && customPlaces.length === 0) {
       setError("Add at least one place to your trip.");
       return;
     }
@@ -87,7 +104,10 @@ export function TripPlannerPage() {
         num_travelers: numTravelers,
         budget_tier: budgetTier,
         travel_mode: travelMode,
-        places: selectedPlaces.map((p) => ({ place_id: p.id })),
+        places: [
+          ...selectedPlaces.map((p) => ({ place_id: p.id })),
+          ...customPlaces.map((name) => ({ custom_name: name })),
+        ],
       });
       navigate(`/trips/${trip.id}`);
     } catch {
@@ -303,7 +323,41 @@ export function TripPlannerPage() {
             </div>
           )}
 
-          {selectedPlaces.length > 0 && (
+          {/* Free-text custom place entry */}
+          <div
+            className="mt-4 pt-4"
+            style={{ borderTop: "1px solid #E5DAC8" }}
+          >
+            <span
+              className="text-[11px] uppercase tracking-[0.12em] mb-2 block"
+              style={{ color: "#A99C8C", fontFamily: "Inter, sans-serif" }}
+            >
+              Or type a place by name
+            </span>
+            <div className="flex gap-2">
+              <input
+                value={customPlaceName}
+                onChange={(e) => setCustomPlaceName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addCustomPlace()}
+                placeholder="e.g. my grandmother's village"
+                className="flex-1 px-3.5 py-2.5 rounded-lg text-[15px] outline-none focus:ring-2"
+                style={inputStyle}
+              />
+              <button
+                onClick={addCustomPlace}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium"
+                style={{
+                  background: "#C9683F",
+                  color: "#FBF6EF",
+                  fontFamily: "Inter, sans-serif",
+                }}
+              >
+                <Plus size={14} /> Add
+              </button>
+            </div>
+          </div>
+
+          {(selectedPlaces.length > 0 || customPlaces.length > 0) && (
             <>
               <div
                 className="mt-4 mb-2 pt-4"
@@ -332,6 +386,26 @@ export function TripPlannerPage() {
                     </p>
                     <button
                       onClick={() => removePlace(place.id)}
+                      style={{ color: "#C9683F" }}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
+                {customPlaces.map((name) => (
+                  <div
+                    key={name}
+                    className="flex justify-between items-center rounded-lg px-3.5 py-2.5"
+                    style={{ background: "#F4EEE4" }}
+                  >
+                    <p
+                      className="text-[15px]"
+                      style={{ color: "#241E1A", fontFamily: "Inter, sans-serif" }}
+                    >
+                      {name} <span style={{ color: "#8B7A66" }}>(custom)</span>
+                    </p>
+                    <button
+                      onClick={() => removeCustomPlace(name)}
                       style={{ color: "#C9683F" }}
                     >
                       <X size={16} />
