@@ -16,31 +16,44 @@ PUBLIC_TRANSPORT_RATE_PER_KM = 2
 MISC_BUFFER_PERCENT = 0.10
 
 
-def get_average_hotel_rate(db: Session, cities: list[str], budget_tier: str) -> float:
-    if not cities:
-        return HOTEL_FALLBACK_RATES.get(budget_tier, HOTEL_FALLBACK_RATES["mid"])
+def _avg_rate(db: Session, model, price_column, budget_tier: str, city: str | None = None) -> float | None:
+    """Average price for a tier, optionally for one city (case-insensitive).
+    Returns None when there are no matching rows."""
+    query = db.query(func.avg(price_column)).filter(model.budget_tier == budget_tier)
+    if city is not None:
+        query = query.filter(func.lower(model.city) == city.lower())
+    value = query.scalar()
+    return float(value) if value is not None else None
 
-    avg_price = (
-        db.query(func.avg(Hotel.price_per_night))
-        .filter(Hotel.city.in_(cities), Hotel.budget_tier == budget_tier)
-        .scalar()
-    )
-    return avg_price if avg_price is not None else HOTEL_FALLBACK_RATES.get(
-        budget_tier, HOTEL_FALLBACK_RATES["mid"]
-    )
+
+def _average_rate(db: Session, model, price_column, cities: list[str], budget_tier: str, constant_rates: dict) -> float:
+    """Prices EACH city separately, then averages across cities.
+    A city with no data is estimated with the tier-wide average (or the constant
+    if the table has nothing for that tier) instead of being silently ignored."""
+    constant = constant_rates.get(budget_tier, constant_rates["mid"])
+    if not cities:
+        return constant
+
+    default = _avg_rate(db, model, price_column, budget_tier)
+    if default is None:
+        default = constant
+
+    unique_cities = {c.lower(): c for c in cities}.values()  # "mysore" and "Mysore" count once
+    rates = []
+    for city in unique_cities:
+        rate = _avg_rate(db, model, price_column, budget_tier, city)
+        rates.append(rate if rate is not None else default)
+
+    return sum(rates) / len(rates)
+
+
+def get_average_hotel_rate(db: Session, cities: list[str], budget_tier: str) -> float:
+    return _average_rate(db, Hotel, Hotel.price_per_night, cities, budget_tier, HOTEL_FALLBACK_RATES)
 
 
 def get_average_food_rate(db: Session, cities: list[str], budget_tier: str) -> float:
-    if not cities:
-        return FOOD_FALLBACK_RATES.get(budget_tier, FOOD_FALLBACK_RATES["mid"])
-
-    avg_price = (
-        db.query(func.avg(Restaurant.avg_cost_per_person_per_day))
-        .filter(Restaurant.city.in_(cities), Restaurant.budget_tier == budget_tier)
-        .scalar()
-    )
-    return avg_price if avg_price is not None else FOOD_FALLBACK_RATES.get(
-        budget_tier, FOOD_FALLBACK_RATES["mid"]
+    return _average_rate(
+        db, Restaurant, Restaurant.avg_cost_per_person_per_day, cities, budget_tier, FOOD_FALLBACK_RATES
     )
 
 
@@ -86,4 +99,3 @@ def calculate_budget(
         "cost_per_day": round(total_cost / num_days, 2) if num_days else 0,
         "cost_per_person": round(total_cost / num_travelers, 2) if num_travelers else 0,
     }
-    
