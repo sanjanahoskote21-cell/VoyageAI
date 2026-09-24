@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Send, Sparkles } from "lucide-react";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { sendChatMessage } from "../api/travelTwinApi";
 
 interface ChatMessage {
@@ -16,6 +18,79 @@ interface ChatMessage {
 //   text-hi: #F4EEE4 · text-lo: #A99C8C
 //   Display: Fraunces · Body/UI: Inter
 // ─────────────────────────────────────────────────────────────
+
+// How each markdown element from the AI is drawn inside the cream bubble.
+const markdownComponents: Components = {
+  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+  strong: ({ children }) => (
+    <strong style={{ fontWeight: 600, color: "#241E1A" }}>{children}</strong>
+  ),
+  em: ({ children }) => <em>{children}</em>,
+  ul: ({ children }) => <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>,
+  ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>,
+  li: ({ children }) => <li>{children}</li>,
+  h1: ({ children }) => (
+    <h3
+      className="text-lg mt-3 mb-1.5"
+      style={{ fontFamily: "Fraunces, serif", fontWeight: 600 }}
+    >
+      {children}
+    </h3>
+  ),
+  h2: ({ children }) => (
+    <h3
+      className="text-lg mt-3 mb-1.5"
+      style={{ fontFamily: "Fraunces, serif", fontWeight: 600 }}
+    >
+      {children}
+    </h3>
+  ),
+  h3: ({ children }) => (
+    <h4
+      className="text-base mt-3 mb-1"
+      style={{ fontFamily: "Fraunces, serif", fontWeight: 600, color: "#C9683F" }}
+    >
+      {children}
+    </h4>
+  ),
+  hr: () => <hr className="my-3" style={{ borderColor: "#DDD0BE" }} />,
+  a: ({ href, children }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      style={{ color: "#C9683F", textDecoration: "underline" }}
+    >
+      {children}
+    </a>
+  ),
+  code: ({ children }) => (
+    <code
+      className="px-1 py-0.5 rounded text-[13px]"
+      style={{ background: "#F1E8DA" }}
+    >
+      {children}
+    </code>
+  ),
+  table: ({ children }) => (
+    <div className="overflow-x-auto mb-2">
+      <table className="text-sm border-collapse">{children}</table>
+    </div>
+  ),
+  th: ({ children }) => (
+    <th
+      className="text-left px-2.5 py-1.5"
+      style={{ borderBottom: "1px solid #DDD0BE", fontWeight: 600 }}
+    >
+      {children}
+    </th>
+  ),
+  td: ({ children }) => (
+    <td className="px-2.5 py-1.5" style={{ borderBottom: "1px solid #EEE4D4" }}>
+      {children}
+    </td>
+  ),
+};
 
 export function TravelTwinPage() {
   const { tripId } = useParams<{ tripId: string }>();
@@ -105,7 +180,9 @@ export function TravelTwinPage() {
           {messages.map((msg, i) => (
             <div
               key={i}
-              className="p-3.5 rounded-xl max-w-[80%] text-[15px] leading-relaxed"
+              className={`p-3.5 rounded-xl text-[15px] leading-relaxed ${
+                msg.role === "user" ? "max-w-[80%]" : "max-w-[92%]"
+              }`}
               style={
                 msg.role === "user"
                   ? {
@@ -121,7 +198,13 @@ export function TravelTwinPage() {
                     }
               }
             >
-              {msg.content}
+              {msg.role === "user" ? (
+                <span className="whitespace-pre-wrap">{msg.content}</span>
+              ) : (
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                  {msg.content}
+                </ReactMarkdown>
+              )}
             </div>
           ))}
 
