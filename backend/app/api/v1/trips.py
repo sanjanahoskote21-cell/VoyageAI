@@ -42,15 +42,17 @@ def add_custom_place_to_trip(
 
     try:
         latitude, longitude, resolved_city = geocode_place_name(payload.place_name, payload.city_hint)
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Could not find location: {payload.place_name}",
-        )
+    except ValueError as exc:
+        # str(exc) carries the geocoder's own message (spelling / add-the-district hint)
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    name = payload.place_name.strip()
+    if name.islower():
+        name = name.title()  # 'bellary' -> 'Bellary'
 
     trip_place = TripPlace(
         trip_id=trip_id,
-        custom_name=payload.place_name,
+        custom_name=name,
         custom_city=payload.city_hint or resolved_city,
         latitude=latitude,
         longitude=longitude,
@@ -141,7 +143,7 @@ def create_new_trip(
 
 @router.get("/{trip_id}", response_model=TripResponse)
 def get_trip_by_id(
-    trip_id: str,
+    trip_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
