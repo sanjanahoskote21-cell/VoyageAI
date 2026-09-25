@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { searchPlaces, type PlaceResponse } from "../api/placeApi";
 import { createTrip } from "../api/tripApi";
+import { getErrorMessage } from "../utils/getErrorMessage";
 
 // ─────────────────────────────────────────────────────────────
 // VoyageAI — TripPlannerPage
@@ -110,8 +111,8 @@ export function TripPlannerPage() {
         ],
       });
       navigate(`/trips/${trip.id}`);
-    } catch {
-      setError("Failed to create trip. Please try again.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to create trip. Please try again."));
     } finally {
       setIsSubmitting(false);
     }
