@@ -219,3 +219,68 @@ def test_optimize_route_with_single_place():
     assert result["ordered_place_ids"] == ["a"]
     # only one possible route with a single place — nothing to optimize
     assert result["distance_saved_km"] == 0.0
+
+
+# ── optimize_route with a fixed end point ───────────────────────────
+
+def test_optimize_route_with_end_keeps_end_out_of_ordered_places():
+    start = Point(id="start", latitude=0.0, longitude=0.0)
+    end = Point(id="end", latitude=5.0, longitude=0.0)
+    places = [
+        Point(id="a", latitude=1.0, longitude=0.1),
+        Point(id="b", latitude=3.0, longitude=-0.1),
+    ]
+    result = optimize_route(start, places, end=end)
+
+    assert sorted(result["ordered_place_ids"]) == sorted(p.id for p in places)
+    assert "end" not in result["ordered_place_ids"]
+    assert start.id not in result["ordered_place_ids"]
+
+
+def test_optimize_route_with_end_includes_the_final_leg_in_distance():
+    # A single place, then a further end point - distance must cover
+    # start -> place -> end, not stop at the place.
+    start = Point(id="start", latitude=0.0, longitude=0.0)
+    place = Point(id="a", latitude=1.0, longitude=0.0)
+    end = Point(id="end", latitude=2.0, longitude=0.0)
+
+    result = optimize_route(start, [place], end=end)
+    expected = haversine_distance(start, place) + haversine_distance(place, end)
+    assert result["optimized_distance_km"] == pytest.approx(expected, abs=0.01)
+
+
+def test_optimize_route_with_end_orders_places_toward_it():
+    # b is closer to start but further from end; a is the reverse.
+    # The shortest start->...->end path visits a (near start) before b
+    # (near end), even though nearest-neighbor alone would prefer
+    # whichever place is literally closest to start first.
+    start = Point(id="start", latitude=0.0, longitude=0.0)
+    a = Point(id="a", latitude=1.0, longitude=0.0)
+    b = Point(id="b", latitude=4.0, longitude=0.0)
+    end = Point(id="end", latitude=5.0, longitude=0.0)
+
+    result = optimize_route(start, [a, b], end=end)
+    assert result["ordered_place_ids"] == ["a", "b"]
+
+
+def test_optimize_route_with_end_and_no_places_is_just_the_direct_leg():
+    start = Point(id="start", latitude=0.0, longitude=0.0)
+    end = Point(id="end", latitude=3.0, longitude=4.0)  # 5km by the 3-4-5 triangle, in degrees terms just a smoke check
+
+    result = optimize_route(start, [], end=end)
+    assert result["ordered_place_ids"] == []
+    assert result["optimized_distance_km"] == pytest.approx(haversine_distance(start, end), abs=0.01)
+
+
+def test_optimize_route_without_end_is_unchanged_from_before():
+    # end=None (the default) must reproduce the exact old behavior -
+    # this pins that the new parameter doesn't alter existing callers.
+    start = Point(id="start", latitude=0.0, longitude=0.0)
+    places = [
+        Point(id="a", latitude=0.3, longitude=0.9),
+        Point(id="b", latitude=1.1, longitude=0.2),
+        Point(id="c", latitude=0.6, longitude=1.4),
+    ]
+    with_default = optimize_route(start, places)
+    explicit_none = optimize_route(start, places, end=None)
+    assert with_default == explicit_none
