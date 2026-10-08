@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
 from app.models.user import User
-from app.schemas.user import UserCreate, UserLogin
+from app.schemas.user import UserCreate, UserLogin, UserUpdate
 from app.core.security import (
     hash_password,
     verify_password,
@@ -63,6 +63,20 @@ def authenticate_user(db: Session, credentials: UserLogin) -> str:
         )
 
     return create_access_token(user_id=str(user.id))
+
+
+def update_user_profile(db: Session, user: User, data: UserUpdate) -> User:
+    full_name = data.full_name.strip()
+    if not full_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Name cannot be empty.",
+        )
+
+    user.full_name = full_name
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 def verify_email(db: Session, token: str) -> None:

@@ -25,6 +25,10 @@ export interface ResetPasswordPayload {
   new_password: string;
 }
 
+export interface UpdateProfilePayload {
+  full_name: string;
+}
+
 export interface UserResponse {
   id: string;
   email: string;
@@ -55,6 +59,11 @@ export const loginUser = async (data: LoginPayload): Promise<TokenResponse> => {
 
 export const getCurrentUser = async (): Promise<UserResponse> => {
   const response = await axiosClient.get<UserResponse>('/auth/me');
+  return response.data;
+};
+
+export const updateProfile = async (data: UpdateProfilePayload): Promise<UserResponse> => {
+  const response = await axiosClient.patch<UserResponse>('/auth/me', data);
   return response.data;
 };
 

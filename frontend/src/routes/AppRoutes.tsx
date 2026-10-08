@@ -5,6 +5,7 @@ import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '../pages/ResetPasswordPage';
 import { VerifyEmailPage } from '../pages/VerifyEmailPage';
 import { DashboardPage } from '../pages/DashboardPage';
+import { ProfilePage } from '../pages/ProfilePage';
 import { TripPlannerPage } from '../pages/TripPlannerPage';
 import { ItineraryPage } from '../pages/ItineraryPage';
 import { TravelTwinPage } from '../pages/TravelTwinPage';
@@ -25,6 +26,14 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <ProfilePage />
           </ProtectedRoute>
         }
       />

@@ -16,6 +16,10 @@ class UserLogin(BaseModel):
     password: str
 
 
+class UserUpdate(BaseModel):
+    full_name: str
+
+
 class UserResponse(BaseModel):
     id: UUID
     email: EmailStr

@@ -17,6 +17,7 @@ from app.services.trip_service import (
     list_user_trips,
     geocode_place_name,
     recalculate_trip,
+    delete_trip,
 )
 from app.services.recommendation_service import get_recommendations
 from app.schemas.recommendation import RecommendedPlace
@@ -156,3 +157,13 @@ def list_my_trips(
     current_user: User = Depends(get_current_user),
 ):
     return list_user_trips(db, current_user)
+
+
+@router.delete("/{trip_id}", status_code=204)
+def delete_trip_endpoint(
+    trip_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    delete_trip(db, current_user, str(trip_id))
+    return None

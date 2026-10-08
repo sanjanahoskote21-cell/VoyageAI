@@ -29,8 +29,12 @@ class Trip(Base):
     owner = relationship("User", backref="trips")
     trip_places = relationship("TripPlace", back_populates="trip", cascade="all, delete-orphan")
     budget_estimate = relationship("BudgetEstimate", back_populates="trip", uselist=False, cascade="all, delete-orphan")
-    chat_messages = relationship("ChatMessage", back_populates="trip")
-    
+    # Was missing cascade="all, delete-orphan" - deleting any trip that had been
+    # used with Travel Twin (i.e. has chat history) raised an IntegrityError,
+    # since chat_messages.trip_id is NOT NULL and nothing told SQLAlchemy to
+    # delete those rows first. Confirmed and fixed alongside adding trip deletion.
+    chat_messages = relationship("ChatMessage", back_populates="trip", cascade="all, delete-orphan")
+
 class TripPlace(Base):
     __tablename__ = "trip_places"
 
@@ -64,4 +68,3 @@ class TripPlace(Base):
     @property
     def resolved_longitude(self) -> float:
         return self.place.longitude if self.place else self.longitude
-    

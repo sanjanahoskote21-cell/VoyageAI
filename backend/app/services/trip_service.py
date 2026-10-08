@@ -10,7 +10,6 @@ from app.schemas.trip import TripCreate
 from app.services.route_optimizer import optimize_route, Point
 from app.services.budget_service import calculate_budget
 from app.services.geocoding_service import geocode_place, GeocodingError
-from app.services.geo_utils import haversine_km
 
 
 def geocode_place_name(place_name: str, city_hint: str | None = None) -> tuple[float, float, str]:
@@ -62,14 +61,14 @@ def _apply_route_and_budget(
     end_coords: tuple[float, float] | None = None,
 ) -> None:
     """Route optimization + budget for ALL of a trip's places (seeded and custom).
-    If end_coords is given, the drive from the last stop to the trip's end location
-    is added to the total distance. Used by both create_trip and recalculate_trip
-    so they can never disagree. Does not commit - the caller does."""
+    If end_coords is given, it's passed to optimize_route as a FIXED end point,
+    so the optimizer orders places to make the whole start-to-end trip short -
+    not just the start-to-last-place leg. Used by both create_trip and
+    recalculate_trip so they can never disagree. Does not commit - the caller does."""
     trip_places = db.query(TripPlace).filter(TripPlace.trip_id == trip.id).all()
 
     if trip_places:
         points = []
-        coords_by_id = {}
         for tp in trip_places:
             lat, lon = _coords_for(db, tp)
             if lat is None or lon is None:
@@ -78,21 +77,19 @@ def _apply_route_and_budget(
                     detail=f"'{tp.custom_name or 'A place'}' has no coordinates, so it can't be routed.",
                 )
             points.append(Point(id=str(tp.id), latitude=lat, longitude=lon))
-            coords_by_id[str(tp.id)] = (lat, lon)
 
         start_point = Point(id="start", latitude=start_lat, longitude=start_lon)
-        result = optimize_route(start_point, points)
+        end_point = (
+            Point(id="end", latitude=end_coords[0], longitude=end_coords[1])
+            if end_coords else None
+        )
+        result = optimize_route(start_point, points, end=end_point)
 
         visit_order_map = {pid: i + 1 for i, pid in enumerate(result["ordered_place_ids"])}
         for tp in trip_places:
             tp.visit_order = visit_order_map.get(str(tp.id))
 
-        total_km = result["optimized_distance_km"]
-        if end_coords:
-            last_lat, last_lon = coords_by_id[result["ordered_place_ids"][-1]]
-            total_km += haversine_km(last_lat, last_lon, end_coords[0], end_coords[1])
-
-        trip.total_distance_km = round(total_km, 2)
+        trip.total_distance_km = result["optimized_distance_km"]
         trip.distance_saved_km = result["distance_saved_km"]
     else:
         trip.total_distance_km = None
@@ -210,6 +207,17 @@ def get_trip(db: Session, user: User, trip_id: str) -> Trip:
     if not trip:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found.")
     return _sorted_places(trip)
+
+
+def delete_trip(db: Session, user: User, trip_id: str) -> None:
+    """Deletes a trip the user owns, along with its places, budget estimate
+    and chat history (see the cascade= on Trip's relationships in
+    app/models/trip.py - that's what makes one db.delete() here enough)."""
+    trip = db.query(Trip).filter(Trip.id == trip_id, Trip.user_id == user.id).first()
+    if not trip:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found.")
+    db.delete(trip)
+    db.commit()
 
 
 def list_user_trips(db: Session, user: User) -> list[Trip]:

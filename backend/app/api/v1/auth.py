@@ -8,6 +8,7 @@ from app.core.limiter import limiter
 from app.schemas.user import (
     UserCreate,
     UserLogin,
+    UserUpdate,
     UserResponse,
     Token,
     ForgotPasswordRequest,
@@ -20,6 +21,7 @@ from app.schemas.user import (
 from app.services.auth_service import (
     register_user,
     authenticate_user,
+    update_user_profile,
     request_password_reset,
     reset_password,
     verify_email,
@@ -47,6 +49,15 @@ def login(request: Request, credentials: UserLogin, db: Session = Depends(get_db
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.patch("/me", response_model=UserResponse)
+def update_me(
+    data: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return update_user_profile(db, current_user, data)
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)

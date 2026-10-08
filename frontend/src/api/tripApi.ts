@@ -90,3 +90,7 @@ export const addPlaceToTrip = async (tripId: string, placeId: string): Promise<T
 export const removePlaceFromTrip = async (tripId: string, tripPlaceId: string): Promise<void> => {
   await axiosClient.delete(`/trips/${tripId}/places/${tripPlaceId}`);
 };
+
+export const deleteTrip = async (tripId: string): Promise<void> => {
+  await axiosClient.delete(`/trips/${tripId}`);
+};

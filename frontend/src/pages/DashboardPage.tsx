@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   MapPin,
   Plus,
@@ -10,9 +10,11 @@ import {
   LogOut,
   IndianRupee,
   Compass,
+  Trash2,
+  UserRound,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
-import { listMyTrips, type TripResponse } from "../api/tripApi";
+import { listMyTrips, deleteTrip, type TripResponse } from "../api/tripApi";
 
 // ─────────────────────────────────────────────────────────────
 // VoyageAI — DashboardPage
@@ -29,7 +31,23 @@ const TIER_LABEL: Record<string, string> = {
   luxury: "Luxury",
 };
 
-function TripCard({ trip }: { trip: TripResponse }) {
+interface TripCardProps {
+  trip: TripResponse;
+  isConfirmingDelete: boolean;
+  isDeleting: boolean;
+  onRequestDelete: () => void;
+  onCancelDelete: () => void;
+  onConfirmDelete: () => void;
+}
+
+function TripCard({
+  trip,
+  isConfirmingDelete,
+  isDeleting,
+  onRequestDelete,
+  onCancelDelete,
+  onConfirmDelete,
+}: TripCardProps) {
   const dest =
     trip.end_location && trip.end_location !== trip.start_location
       ? `${trip.start_location} → ${trip.end_location}`
@@ -55,15 +73,79 @@ function TripCard({ trip }: { trip: TripResponse }) {
             {TIER_LABEL[trip.budget_tier] ?? trip.budget_tier}
           </span>
         </div>
-        {trip.distance_saved_km != null && trip.distance_saved_km > 0 && (
-          <div
-            className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full"
-            style={{ background: "#EFE6D8", color: "#3F8F5F" }}
-          >
-            <TrendingDown size={11} />
-            {trip.distance_saved_km.toFixed(0)} km saved
-          </div>
-        )}
+
+        <div className="flex items-center gap-2">
+          {trip.distance_saved_km != null && trip.distance_saved_km > 0 && !isConfirmingDelete && (
+            <div
+              className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full"
+              style={{ background: "#EFE6D8", color: "#3F8F5F" }}
+            >
+              <TrendingDown size={11} />
+              {trip.distance_saved_km.toFixed(0)} km saved
+            </div>
+          )}
+
+          {isConfirmingDelete ? (
+            <div className="flex items-center gap-1.5" onClick={(e) => e.preventDefault()}>
+              <span
+                className="text-[11px]"
+                style={{ color: "#8B7A66", fontFamily: "Inter, sans-serif" }}
+              >
+                Delete?
+              </span>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onConfirmDelete();
+                }}
+                disabled={isDeleting}
+                className="text-[11px] font-medium px-2 py-1 rounded-md"
+                style={{
+                  background: "#C9683F",
+                  color: "#FBF6EF",
+                  fontFamily: "Inter, sans-serif",
+                  border: "none",
+                  cursor: isDeleting ? "default" : "pointer",
+                  opacity: isDeleting ? 0.6 : 1,
+                }}
+              >
+                {isDeleting ? "Deleting..." : "Yes"}
+              </button>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onCancelDelete();
+                }}
+                disabled={isDeleting}
+                className="text-[11px] px-2 py-1 rounded-md"
+                style={{
+                  background: "transparent",
+                  color: "#8B7A66",
+                  border: "1px solid #DDD0BE",
+                  fontFamily: "Inter, sans-serif",
+                  cursor: isDeleting ? "default" : "pointer",
+                }}
+              >
+                No
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onRequestDelete();
+              }}
+              title="Delete trip"
+              className="flex items-center justify-center w-7 h-7 rounded-full shrink-0"
+              style={{ background: "transparent", color: "#B8A88F", border: "none", cursor: "pointer" }}
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
       </div>
 
       <h3
@@ -187,6 +269,10 @@ function LoadingSkeleton() {
 export function DashboardPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const [confirmDeleteId, setConfirmDeleteId] = React.useState<string | null>(null);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
   const {
     data: trips,
@@ -195,6 +281,20 @@ export function DashboardPage() {
   } = useQuery({
     queryKey: ["trips"],
     queryFn: listMyTrips,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (tripId: string) => deleteTrip(tripId),
+    onMutate: () => {
+      setDeleteError(null);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["trips"] });
+      setConfirmDeleteId(null);
+    },
+    onError: () => {
+      setDeleteError("Couldn't delete that trip. Try again.");
+    },
   });
 
   const handleLogout = () => {
@@ -224,13 +324,22 @@ export function DashboardPage() {
             VoyageAI
           </span>
         </div>
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-1.5 text-sm"
-          style={{ color: "#A99C8C", fontFamily: "Inter, sans-serif" }}
-        >
-          <LogOut size={15} /> Log out
-        </button>
+        <div className="flex items-center gap-5">
+          <Link
+            to="/profile"
+            className="flex items-center gap-1.5 text-sm"
+            style={{ color: "#A99C8C", fontFamily: "Inter, sans-serif", textDecoration: "none" }}
+          >
+            <UserRound size={15} /> Profile
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 text-sm"
+            style={{ color: "#A99C8C", fontFamily: "Inter, sans-serif", background: "transparent", border: "none", cursor: "pointer" }}
+          >
+            <LogOut size={15} /> Log out
+          </button>
+        </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 sm:px-10 py-10">
@@ -275,12 +384,26 @@ export function DashboardPage() {
           </p>
         )}
 
+        {deleteError && (
+          <p className="mb-4 text-sm" style={{ color: "#C9683F", fontFamily: "Inter, sans-serif" }}>
+            {deleteError}
+          </p>
+        )}
+
         {!isLoading && !isError && trips && trips.length === 0 && <EmptyState />}
 
         {!isLoading && !isError && trips && trips.length > 0 && (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {trips.map((trip) => (
-              <TripCard key={trip.id} trip={trip} />
+              <TripCard
+                key={trip.id}
+                trip={trip}
+                isConfirmingDelete={confirmDeleteId === trip.id}
+                isDeleting={deleteMutation.isPending && deleteMutation.variables === trip.id}
+                onRequestDelete={() => setConfirmDeleteId(trip.id)}
+                onCancelDelete={() => setConfirmDeleteId(null)}
+                onConfirmDelete={() => deleteMutation.mutate(trip.id)}
+              />
             ))}
           </div>
         )}

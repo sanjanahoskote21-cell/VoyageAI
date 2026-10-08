@@ -7,6 +7,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (credentials: LoginPayload) => Promise<void>;
   logout: () => void;
+  updateUser: (user: UserResponse) => void;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -43,8 +44,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  // Called after a successful profile edit, so the new name shows up
+  // everywhere (dashboard greeting, etc.) without a re-login.
+  const updateUser = (updated: UserResponse) => {
+    setUser(updated);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
