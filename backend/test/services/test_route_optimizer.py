@@ -1,6 +1,5 @@
-# tests/services/test_route_optimizer.py
+# backend/test/services/test_route_optimizer.py
 
-import math
 import pytest
 
 from app.services.route_optimizer import (
@@ -78,9 +77,8 @@ def test_nearest_neighbor_visits_every_place_exactly_once():
 
 
 def test_nearest_neighbor_picks_closest_first():
-    # Places placed at increasing distance from start along a line — the
-    # greedy nearest-neighbor choice is unambiguous here, so the order is
-    # fully predictable: closest first, each step.
+    # Places at increasing distance along a line: the greedy choice is
+    # unambiguous, so the order is fully predictable.
     start = Point(id="start", latitude=0.0, longitude=0.0)
     near = Point(id="near", latitude=0.0, longitude=1.0)
     mid = Point(id="mid", latitude=0.0, longitude=2.0)
@@ -114,28 +112,24 @@ def test_two_opt_never_makes_a_route_worse():
 
 def test_two_opt_uncrosses_a_known_bad_route():
     # Four corners of a square. A route that zigzags across the diagonals
-    # is provably worse than one that walks the perimeter. This route is
-    # built by hand (not via nearest-neighbor) specifically to contain a
-    # crossing, so this test checks 2-opt's actual job: untangling it.
+    # is provably worse than one that walks the perimeter. Built by hand
+    # (not via nearest-neighbor) so it definitely contains a crossing.
     s = Point(id="s", latitude=0.0, longitude=0.0)   # bottom-left
     a = Point(id="a", latitude=0.0, longitude=1.0)   # bottom-right
     b = Point(id="b", latitude=1.0, longitude=1.0)   # top-right
     c = Point(id="c", latitude=1.0, longitude=0.0)   # top-left
 
-    crossed_route = [s, b, a, c]  # s→b and a→c cross through the middle
+    crossed_route = [s, b, a, c]  # s->b and a->c cross through the middle
     fixed_route = two_opt(crossed_route)
 
-    crossed_distance = total_route_distance(crossed_route)
-    fixed_distance = total_route_distance(fixed_route)
-
-    assert fixed_distance < crossed_distance
-    # every point still present exactly once — 2-opt reorders, never drops
+    assert total_route_distance(fixed_route) < total_route_distance(crossed_route)
+    # every point still present exactly once: 2-opt reorders, never drops
     assert sorted(p.id for p in fixed_route) == sorted(p.id for p in crossed_route)
 
 
 def test_two_opt_on_already_optimal_route_is_unchanged_in_distance():
-    # A straight line is already optimal — 2-opt shouldn't be able to
-    # improve on it, and shouldn't make it worse either.
+    # A straight line is already optimal; 2-opt can't improve it and
+    # shouldn't make it worse either.
     route = [
         Point(id="a", latitude=0.0, longitude=0.0),
         Point(id="b", latitude=0.0, longitude=1.0),
@@ -147,8 +141,7 @@ def test_two_opt_on_already_optimal_route_is_unchanged_in_distance():
 
 
 def test_two_opt_handles_short_routes_without_error():
-    # Routes with fewer than 3 points have no valid segment to reverse —
-    # this should be a no-op, not a crash.
+    # Fewer than 3 points has no valid segment to reverse: no-op, not a crash.
     start_only = [Point(id="a", latitude=0.0, longitude=0.0)]
     two_points = [
         Point(id="a", latitude=0.0, longitude=0.0),
@@ -217,7 +210,7 @@ def test_optimize_route_with_single_place():
     result = optimize_route(start, [place])
 
     assert result["ordered_place_ids"] == ["a"]
-    # only one possible route with a single place — nothing to optimize
+    # only one possible route with a single place: nothing to optimize
     assert result["distance_saved_km"] == 0.0
 
 
@@ -238,7 +231,7 @@ def test_optimize_route_with_end_keeps_end_out_of_ordered_places():
 
 
 def test_optimize_route_with_end_includes_the_final_leg_in_distance():
-    # A single place, then a further end point - distance must cover
+    # One place, then a further end point: distance must cover
     # start -> place -> end, not stop at the place.
     start = Point(id="start", latitude=0.0, longitude=0.0)
     place = Point(id="a", latitude=1.0, longitude=0.0)
@@ -250,10 +243,8 @@ def test_optimize_route_with_end_includes_the_final_leg_in_distance():
 
 
 def test_optimize_route_with_end_orders_places_toward_it():
-    # b is closer to start but further from end; a is the reverse.
-    # The shortest start->...->end path visits a (near start) before b
-    # (near end), even though nearest-neighbor alone would prefer
-    # whichever place is literally closest to start first.
+    # The shortest start -> ... -> end path visits a (near start) before
+    # b (near end).
     start = Point(id="start", latitude=0.0, longitude=0.0)
     a = Point(id="a", latitude=1.0, longitude=0.0)
     b = Point(id="b", latitude=4.0, longitude=0.0)
@@ -265,15 +256,17 @@ def test_optimize_route_with_end_orders_places_toward_it():
 
 def test_optimize_route_with_end_and_no_places_is_just_the_direct_leg():
     start = Point(id="start", latitude=0.0, longitude=0.0)
-    end = Point(id="end", latitude=3.0, longitude=4.0)  # 5km by the 3-4-5 triangle, in degrees terms just a smoke check
+    end = Point(id="end", latitude=3.0, longitude=4.0)
 
     result = optimize_route(start, [], end=end)
     assert result["ordered_place_ids"] == []
-    assert result["optimized_distance_km"] == pytest.approx(haversine_distance(start, end), abs=0.01)
+    assert result["optimized_distance_km"] == pytest.approx(
+        haversine_distance(start, end), abs=0.01
+    )
 
 
 def test_optimize_route_without_end_is_unchanged_from_before():
-    # end=None (the default) must reproduce the exact old behavior -
+    # end=None (the default) must reproduce the old behavior exactly:
     # this pins that the new parameter doesn't alter existing callers.
     start = Point(id="start", latitude=0.0, longitude=0.0)
     places = [
