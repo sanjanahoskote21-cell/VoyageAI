@@ -34,3 +34,6 @@ uvicorn==0.51.0
 watchfiles==1.2.0
 websockets==16.1
 slowapi==0.1.10
+
+google-genai==2.19.0
+requests==2.34.2
