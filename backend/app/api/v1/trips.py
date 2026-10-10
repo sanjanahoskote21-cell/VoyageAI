@@ -128,7 +128,7 @@ def get_trip_recommendations(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        return get_recommendations(trip_id, db)
+        return get_recommendations(trip_id, db, user_id=current_user.id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Trip not found")
 

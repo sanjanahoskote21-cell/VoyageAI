@@ -13,8 +13,11 @@ CATEGORY_WEIGHT = 0.35
 PROXIMITY_WEIGHT = 0.25
 
 
-def get_recommendations(trip_id: UUID, db: Session) -> list[dict]:
-    trip = db.query(Trip).filter(Trip.id == trip_id).first()
+def get_recommendations(trip_id: UUID, db: Session, *, user_id: UUID) -> list[dict]:
+    # user_id is required (keyword-only) so no caller can forget the ownership
+    # check. A trip that exists but belongs to someone else raises the same
+    # ValueError as a missing one, so the API can't be used to probe trip ids.
+    trip = db.query(Trip).filter(Trip.id == trip_id, Trip.user_id == user_id).first()
     if not trip:
         raise ValueError("Trip not found")
 

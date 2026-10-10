@@ -1,7 +1,10 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from uuid import UUID
 
+
 class RecommendedPlace(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     name: str
     category: str
@@ -13,6 +16,3 @@ class RecommendedPlace(BaseModel):
     rating_score: float
     category_score: float
     proximity_score: float
-
-    class Config:
-        from_attributes = True

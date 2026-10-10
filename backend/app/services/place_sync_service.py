@@ -1,6 +1,6 @@
 # app/services/place_sync_service.py
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models.place import Place
@@ -38,7 +38,8 @@ def sync_places_for_city(db: Session, city: str, query: str | None = None) -> li
             place.avg_rating = r.get("rating")
             if place.external_place_id is None:
                 place.external_place_id = r["external_place_id"]
-        place.last_synced_at = datetime.utcnow()
+        # Naive UTC, because the last_synced_at column is timezone-naive.
+        place.last_synced_at = datetime.now(timezone.utc).replace(tzinfo=None)
         synced.append(place)
 
     db.commit()
