@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Check, Eye, EyeOff, ArrowRight, ArrowLeft, MapPin } from "lucide-react";
 import { registerUser } from "../api/authApi";
@@ -16,7 +17,9 @@ import { getErrorMessage } from "../utils/getErrorMessage";
 // Display face: Fraunces · Body/UI face: Inter
 // ─────────────────────────────────────────────────────────────
 
-const CITIES = [
+type City = { name: string; x: number; y: number };
+
+const CITIES: City[] = [
   { name: "Bengaluru", x: 60, y: 72 },
   { name: "Mysore", x: 40, y: 71 },
   { name: "Coorg", x: 20, y: 72 },
@@ -27,9 +30,12 @@ const CITIES = [
   { name: "Bidar", x: 78, y: 50 },
 ];
 
-const ROUTE = "Bidar-Dharwad-Hampi-Chikkamagalur-Mangalore-Coorg-Mysore-Bengaluru"
+// The type guard drops any name that isn't in CITIES, so ROUTE is City[]
+// (not (City | undefined)[]) and the map below is type-safe.
+const ROUTE: City[] = "Bidar-Dharwad-Hampi-Chikkamagalur-Mangalore-Coorg-Mysore-Bengaluru"
   .split("-")
-  .map((n) => CITIES.find((c) => c.name === n));
+  .map((n) => CITIES.find((c) => c.name === n))
+  .filter((c): c is City => c !== undefined);
 
 function RouteMap() {
   const points = ROUTE.map((c) => `${c.x},${c.y}`).join(" ");
@@ -106,7 +112,7 @@ function RouteMap() {
   );
 }
 
-function passwordStrength(pw) {
+function passwordStrength(pw: string): number {
   let score = 0;
   if (pw.length >= 8) score++;
   if (/[A-Z]/.test(pw)) score++;
@@ -117,7 +123,7 @@ function passwordStrength(pw) {
 
 const STRENGTH_LABEL = ["Too short", "Weak", "Okay", "Good", "Strong"];
 
-function Field({ label, children }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block mb-4">
       <span
@@ -131,12 +137,16 @@ function Field({ label, children }) {
   );
 }
 
-const inputBase = {
+const inputBase: CSSProperties = {
   fontFamily: "Inter, sans-serif",
   background: "#F4EEE4",
   border: "1px solid #DDD0BE",
   color: "#241E1A",
 };
+
+// Tailwind reads --tw-ring-color, but React's CSSProperties type doesn't
+// know custom properties, so this one is cast once here.
+const inputWithRing = { ...inputBase, "--tw-ring-color": "#C9683F" } as CSSProperties;
 
 export default function RegisterPage() {
   const [step, setStep] = useState(1);
@@ -272,181 +282,181 @@ export default function RegisterPage() {
               ))}
             </div>
 
-        {step === 1 && (
-          <div>
-            <Field label="Full name">
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ananya Rao"
-                className="w-full px-3.5 py-2.5 rounded-lg text-[15px] outline-none focus:ring-2"
-                style={{ ...inputBase, "--tw-ring-color": "#C9683F" }}
-              />
-            </Field>
-            <Field label="Email">
-              <div className="relative">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onBlur={() => setTouched(true)}
-                  placeholder="you@example.com"
-                  className="w-full px-3.5 py-2.5 pr-9 rounded-lg text-[15px] outline-none focus:ring-2"
-                  style={inputBase}
-                />
-                {email.length > 0 && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2">
-                    {emailValid ? (
-                      <Check size={16} color="#3F8F5F" />
-                    ) : (
-                      <span
-                        className="block w-1.5 h-1.5 rounded-full"
-                        style={{ background: "#C9683F" }}
-                      />
+            {step === 1 && (
+              <div>
+                <Field label="Full name">
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Ananya Rao"
+                    className="w-full px-3.5 py-2.5 rounded-lg text-[15px] outline-none focus:ring-2"
+                    style={inputWithRing}
+                  />
+                </Field>
+                <Field label="Email">
+                  <div className="relative">
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      onBlur={() => setTouched(true)}
+                      placeholder="you@example.com"
+                      className="w-full px-3.5 py-2.5 pr-9 rounded-lg text-[15px] outline-none focus:ring-2"
+                      style={inputBase}
+                    />
+                    {email.length > 0 && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                        {emailValid ? (
+                          <Check size={16} color="#3F8F5F" />
+                        ) : (
+                          <span
+                            className="block w-1.5 h-1.5 rounded-full"
+                            style={{ background: "#C9683F" }}
+                          />
+                        )}
+                      </span>
                     )}
-                  </span>
-                )}
-              </div>
-              {touched && !emailValid && email.length > 0 && (
-                <span
-                  className="block text-xs mt-1"
-                  style={{ color: "#C9683F", fontFamily: "Inter, sans-serif" }}
-                >
-                  Enter a valid email address
-                </span>
-              )}
-            </Field>
+                  </div>
+                  {touched && !emailValid && email.length > 0 && (
+                    <span
+                      className="block text-xs mt-1"
+                      style={{ color: "#C9683F", fontFamily: "Inter, sans-serif" }}
+                    >
+                      Enter a valid email address
+                    </span>
+                  )}
+                </Field>
 
-            <button
-              disabled={!canAdvance}
-              onClick={() => setStep(2)}
-              className="w-full mt-2 flex items-center justify-center gap-2 py-3 rounded-lg text-[15px] font-medium transition-all duration-200"
-              style={{
-                fontFamily: "Inter, sans-serif",
-                background: canAdvance ? "#C9683F" : "#E5DAC8",
-                color: canAdvance ? "#FBF6EF" : "#A99C8C",
-                cursor: canAdvance ? "pointer" : "not-allowed",
-              }}
-            >
-              Continue <ArrowRight size={16} />
-            </button>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div>
-            <Field label="Password">
-              <div className="relative">
-                <input
-                  type={showPw ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full px-3.5 py-2.5 pr-10 rounded-lg text-[15px] outline-none focus:ring-2"
-                  style={inputBase}
-                />
                 <button
-                  type="button"
-                  onClick={() => setShowPw((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2"
-                  style={{ color: "#A99C8C" }}
+                  disabled={!canAdvance}
+                  onClick={() => setStep(2)}
+                  className="w-full mt-2 flex items-center justify-center gap-2 py-3 rounded-lg text-[15px] font-medium transition-all duration-200"
+                  style={{
+                    fontFamily: "Inter, sans-serif",
+                    background: canAdvance ? "#C9683F" : "#E5DAC8",
+                    color: canAdvance ? "#FBF6EF" : "#A99C8C",
+                    cursor: canAdvance ? "pointer" : "not-allowed",
+                  }}
                 >
-                  {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                  Continue <ArrowRight size={16} />
                 </button>
               </div>
-
-              {password.length > 0 && (
-                <div className="mt-2">
-                  <div className="flex gap-1">
-                    {[0, 1, 2, 3].map((i) => (
-                      <div
-                        key={i}
-                        className="h-1 flex-1 rounded-full transition-colors duration-200"
-                        style={{
-                          background:
-                            i < strength
-                              ? strength >= 3
-                                ? "#3F8F5F"
-                                : "#C9683F"
-                              : "#E5DAC8",
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <span
-                    className="block text-xs mt-1"
-                    style={{ color: "#8B7A66", fontFamily: "Inter, sans-serif" }}
-                  >
-                    {STRENGTH_LABEL[strength]} — use 8+ chars, a number, and a symbol
-                  </span>
-                </div>
-              )}
-            </Field>
-
-            <Field label="Confirm password">
-              <div className="relative">
-                <input
-                  type={showPw ? "text" : "password"}
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full px-3.5 py-2.5 pr-9 rounded-lg text-[15px] outline-none focus:ring-2"
-                  style={inputBase}
-                />
-                {confirm.length > 0 && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2">
-                    {matchValid ? (
-                      <Check size={16} color="#3F8F5F" />
-                    ) : (
-                      <span
-                        className="block w-1.5 h-1.5 rounded-full"
-                        style={{ background: "#C9683F" }}
-                      />
-                    )}
-                  </span>
-                )}
-              </div>
-            </Field>
-
-            {error && (
-              <p
-                className="text-sm mb-3"
-                style={{ color: "#C9683F", fontFamily: "Inter, sans-serif" }}
-              >
-                {error}
-              </p>
             )}
 
-            <div className="flex gap-2 mt-2">
-              <button
-                onClick={() => setStep(1)}
-                className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-lg text-sm"
-                style={{
-                  fontFamily: "Inter, sans-serif",
-                  background: "transparent",
-                  border: "1px solid #DDD0BE",
-                  color: "#8B7A66",
-                }}
-              >
-                <ArrowLeft size={15} /> Back
-              </button>
-              <button
-                disabled={!canSubmit}
-                onClick={handleSubmit}
-                className="flex-1 py-3 rounded-lg text-[15px] font-medium transition-all duration-200"
-                style={{
-                  fontFamily: "Inter, sans-serif",
-                  background: canSubmit ? "#C9683F" : "#E5DAC8",
-                  color: canSubmit ? "#FBF6EF" : "#A99C8C",
-                  cursor: canSubmit ? "pointer" : "not-allowed",
-                }}
-              >
-                {submitting ? "Creating account..." : "Create account"}
-              </button>
-            </div>
-          </div>
-        )}
+            {step === 2 && (
+              <div>
+                <Field label="Password">
+                  <div className="relative">
+                    <input
+                      type={showPw ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full px-3.5 py-2.5 pr-10 rounded-lg text-[15px] outline-none focus:ring-2"
+                      style={inputBase}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPw((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2"
+                      style={{ color: "#A99C8C" }}
+                    >
+                      {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+
+                  {password.length > 0 && (
+                    <div className="mt-2">
+                      <div className="flex gap-1">
+                        {[0, 1, 2, 3].map((i) => (
+                          <div
+                            key={i}
+                            className="h-1 flex-1 rounded-full transition-colors duration-200"
+                            style={{
+                              background:
+                                i < strength
+                                  ? strength >= 3
+                                    ? "#3F8F5F"
+                                    : "#C9683F"
+                                  : "#E5DAC8",
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <span
+                        className="block text-xs mt-1"
+                        style={{ color: "#8B7A66", fontFamily: "Inter, sans-serif" }}
+                      >
+                        {STRENGTH_LABEL[strength]} — use 8+ chars, a number, and a symbol
+                      </span>
+                    </div>
+                  )}
+                </Field>
+
+                <Field label="Confirm password">
+                  <div className="relative">
+                    <input
+                      type={showPw ? "text" : "password"}
+                      value={confirm}
+                      onChange={(e) => setConfirm(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full px-3.5 py-2.5 pr-9 rounded-lg text-[15px] outline-none focus:ring-2"
+                      style={inputBase}
+                    />
+                    {confirm.length > 0 && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                        {matchValid ? (
+                          <Check size={16} color="#3F8F5F" />
+                        ) : (
+                          <span
+                            className="block w-1.5 h-1.5 rounded-full"
+                            style={{ background: "#C9683F" }}
+                          />
+                        )}
+                      </span>
+                    )}
+                  </div>
+                </Field>
+
+                {error && (
+                  <p
+                    className="text-sm mb-3"
+                    style={{ color: "#C9683F", fontFamily: "Inter, sans-serif" }}
+                  >
+                    {error}
+                  </p>
+                )}
+
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => setStep(1)}
+                    className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-lg text-sm"
+                    style={{
+                      fontFamily: "Inter, sans-serif",
+                      background: "transparent",
+                      border: "1px solid #DDD0BE",
+                      color: "#8B7A66",
+                    }}
+                  >
+                    <ArrowLeft size={15} /> Back
+                  </button>
+                  <button
+                    disabled={!canSubmit}
+                    onClick={handleSubmit}
+                    className="flex-1 py-3 rounded-lg text-[15px] font-medium transition-all duration-200"
+                    style={{
+                      fontFamily: "Inter, sans-serif",
+                      background: canSubmit ? "#C9683F" : "#E5DAC8",
+                      color: canSubmit ? "#FBF6EF" : "#A99C8C",
+                      cursor: canSubmit ? "pointer" : "not-allowed",
+                    }}
+                  >
+                    {submitting ? "Creating account..." : "Create account"}
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
 
