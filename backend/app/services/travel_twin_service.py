@@ -4,7 +4,7 @@ Travel Twin - AI trip companion chat, using context-stuffing (Option A):
 fetch trip data once per request, build one prompt, call Gemini.
 """
 
-import time
+import logging
 
 from fastapi import HTTPException, status
 from google import genai
@@ -18,13 +18,17 @@ from app.models.chat_message import ChatMessage
 from app.services.geo_utils import haversine_km
 from app.services.trip_service import geocode_place_name
 
-settings = get_settings()
-client = genai.Client(api_key=settings.GEMINI_API_KEY)
+logger = logging.getLogger(__name__)
 
-MODEL_NAME = "gemini-3.6-flash"  # versioned, stable - avoids the broken "-latest" alias
+settings = get_settings()
+
+# Timeout is in milliseconds in the SDK. Without it, an overloaded Gemini can hang a request for minutes.
+client = genai.Client(
+    api_key=settings.GEMINI_API_KEY,
+    http_options=types.HttpOptions(timeout=settings.GEMINI_TIMEOUT_SECONDS * 1000),
+)
+
 CHAT_HISTORY_LIMIT = 10  # only send the last N messages, keeps prompt size bounded
-GEMINI_RETRIES = 2  # extra attempts when Gemini is overloaded (503) - these spikes are usually brief
-GEMINI_RETRY_DELAY_SECONDS = 2
 
 TRAVEL_TWIN_INSTRUCTIONS = """
 You are Travel Twin, a friendly travel companion for the user's trip.
@@ -166,28 +170,39 @@ def get_recent_chat_history(db: Session, trip_id) -> list[types.Content]:
     ]
 
 
-def _ask_gemini(chat, user_message: str) -> str:
-    """Sends one message. Retries a few times if Gemini is overloaded, and turns
-    Gemini's errors into clean HTTP errors (a plain crash reaches the browser as a
-    confusing CORS error, because crash responses carry no CORS headers)."""
-    for attempt in range(GEMINI_RETRIES + 1):
+def _ask_gemini(history, system_prompt: str, user_message: str) -> str:
+    """
+    Tries each model in settings.GEMINI_MODELS in order. One attempt per model:
+    if a model times out, is overloaded (503), rate limited (429) or unavailable (404),
+    it logs the real reason and moves on to the next one.
+
+    Always ends in either a reply or a clean HTTPException. A plain crash would reach the
+    browser as a confusing CORS error, because crash responses carry no CORS headers.
+    """
+    if not settings.GEMINI_API_KEY:
+        logger.error("GEMINI_API_KEY is not set")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Travel Twin is not configured right now.",
+        )
+
+    for model in settings.gemini_model_list:
         try:
-            return chat.send_message(user_message).text or ""
-        except genai_errors.ServerError:  # 5xx, e.g. 503 "model is currently experiencing high demand"
-            if attempt < GEMINI_RETRIES:
-                time.sleep(GEMINI_RETRY_DELAY_SECONDS * (attempt + 1))
-                continue
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Travel Twin is busy right now. Please try again in a minute.",
+            chat = client.chats.create(
+                model=model,
+                history=history,
+                config=types.GenerateContentConfig(system_instruction=system_prompt),
             )
-        except genai_errors.ClientError as exc:  # 4xx
-            if getattr(exc, "code", None) == 429:
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Travel Twin has hit its usage limit. Please wait a minute and try again.",
-                )
-            raise
+            return chat.send_message(user_message).text or ""
+        except genai_errors.APIError as exc:  # parent of ClientError (4xx) and ServerError (5xx)
+            logger.warning("Gemini model %s failed: %s %s", model, getattr(exc, "code", None), exc)
+        except Exception:  # timeouts, network errors, anything unexpected
+            logger.exception("Gemini model %s raised an unexpected error", model)
+
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Travel Twin is busy right now. Please try again in a minute.",
+    )
 
 
 def send_message(db: Session, trip: Trip, user_message: str) -> str:
@@ -198,15 +213,9 @@ def send_message(db: Session, trip: Trip, user_message: str) -> str:
 
     history = get_recent_chat_history(db, trip.id)
 
-    chat = client.chats.create(
-        model=MODEL_NAME,
-        history=history,
-        config=types.GenerateContentConfig(system_instruction=system_prompt),
-    )
+    ai_reply = _ask_gemini(history, system_prompt, user_message) or "I couldn't come up with a reply. Could you rephrase that?"
 
-    ai_reply = _ask_gemini(chat, user_message) or "I couldn't come up with a reply. Could you rephrase that?"
-
-    # Save both messages to DB
+    # Save both messages to DB (only reached if Gemini answered)
     db.add(ChatMessage(trip_id=trip.id, role="user", content=user_message))
     db.add(ChatMessage(trip_id=trip.id, role="assistant", content=ai_reply))
     db.commit()

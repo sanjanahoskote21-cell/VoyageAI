@@ -31,6 +31,16 @@ class Settings(BaseSettings):
     GOOGLE_MAPS_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
 
+    # Gemini (Travel Twin)
+    # Comma-separated, tried in order. If one is overloaded/unavailable, the next is used.
+    # Can be changed from Render's Environment tab without touching code.
+    GEMINI_MODELS: str = "gemini-3.7-flash,gemini-3.8-flash"
+    GEMINI_TIMEOUT_SECONDS: int = 35  # per model attempt, so a hung call can't block for minutes
+
+    @property
+    def gemini_model_list(self) -> list[str]:
+        return [m.strip() for m in self.GEMINI_MODELS.split(",") if m.strip()]
+
 
 @lru_cache
 def get_settings() -> Settings:
