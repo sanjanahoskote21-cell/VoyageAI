@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import { isAxiosError } from "axios";
 import { ArrowLeft, Send, Sparkles } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -8,6 +9,17 @@ import { sendChatMessage } from "../api/travelTwinApi";
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+}
+
+// Turns a failed chat request into a message the user can act on.
+// The backend sends { detail: "..." } for known failures (e.g. "Travel Twin is busy right now...").
+function getChatErrorMessage(error: unknown): string {
+  if (isAxiosError(error)) {
+    const detail = error.response?.data?.detail;
+    if (typeof detail === "string" && detail) return detail;
+    if (!error.response) return "Can't reach the server. Check your connection and try again.";
+  }
+  return "Something went wrong. Try again.";
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -113,10 +125,10 @@ export function TravelTwinPage() {
     try {
       const { reply } = await sendChatMessage(tripId, userMessage);
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
-    } catch {
+    } catch (error) {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Something went wrong. Try again." },
+        { role: "assistant", content: getChatErrorMessage(error) },
       ]);
     } finally {
       setIsSending(false);
