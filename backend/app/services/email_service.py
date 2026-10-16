@@ -1,25 +1,58 @@
 # app/services/email_service.py
 
+import logging
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+import httpx
+
 from app.core.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
+BREVO_SEND_URL = "https://api.brevo.com/v3/smtp/email"
+EMAIL_TIMEOUT_SECONDS = 10  # never let an email provider hold a request for minutes
 
-def send_email(to_email: str, subject: str, body: str) -> bool:
-    """
-    Sends a plain-text email via Gmail SMTP. Returns True if sent
-    successfully, False otherwise (e.g. SMTP_USER/SMTP_PASSWORD not
-    configured, or the send failed) — callers should not crash the
-    request just because email delivery failed.
-    """
-    if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-        print("[email] SMTP_USER/SMTP_PASSWORD not configured — skipping send")
+
+def _send_via_brevo(to_email: str, subject: str, body: str) -> bool:
+    """HTTPS call to Brevo. Works on hosts that block SMTP ports (Render free tier)."""
+    sender_email = settings.EMAIL_FROM or settings.SMTP_USER
+    if not sender_email:
+        logger.error("[email] BREVO_API_KEY is set but no sender (EMAIL_FROM / SMTP_USER)")
         return False
 
+    try:
+        response = httpx.post(
+            BREVO_SEND_URL,
+            headers={
+                "api-key": settings.BREVO_API_KEY,
+                "accept": "application/json",
+                "content-type": "application/json",
+            },
+            json={
+                "sender": {"name": "VoyageAI", "email": sender_email},
+                "to": [{"email": to_email}],
+                "subject": subject,
+                "textContent": body,
+            },
+            timeout=EMAIL_TIMEOUT_SECONDS,
+        )
+    except httpx.HTTPError as exc:  # timeouts, connection errors
+        logger.error("[email] Brevo request failed for %s: %s", to_email, exc)
+        return False
+
+    if response.status_code in (200, 201):
+        return True
+
+    logger.error("[email] Brevo rejected email to %s: %s %s", to_email, response.status_code, response.text)
+    return False
+
+
+def _send_via_smtp(to_email: str, subject: str, body: str) -> bool:
+    """Gmail SMTP. Fine locally; blocked on Render's free tier."""
     message = MIMEMultipart()
     message["From"] = settings.SMTP_USER
     message["To"] = to_email
@@ -27,14 +60,32 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
     message.attach(MIMEText(body, "plain"))
 
     try:
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=EMAIL_TIMEOUT_SECONDS) as server:
             server.starttls()
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             server.sendmail(settings.SMTP_USER, to_email, message.as_string())
         return True
-    except smtplib.SMTPException as exc:
-        print(f"[email] Failed to send to {to_email}: {exc}")
+    except (smtplib.SMTPException, OSError) as exc:  # OSError covers timeouts / blocked ports
+        logger.error("[email] SMTP send to %s failed: %s", to_email, exc)
         return False
+
+
+def send_email(to_email: str, subject: str, body: str) -> bool:
+    """
+    Sends a plain-text email. Returns True if sent, False otherwise, so callers
+    never crash a request just because email delivery failed.
+
+    Uses Brevo's HTTP API when BREVO_API_KEY is set (needed on Render's free tier),
+    otherwise falls back to Gmail SMTP, otherwise skips.
+    """
+    if settings.BREVO_API_KEY:
+        return _send_via_brevo(to_email, subject, body)
+
+    if settings.SMTP_USER and settings.SMTP_PASSWORD:
+        return _send_via_smtp(to_email, subject, body)
+
+    logger.warning("[email] No email provider configured - skipping send")
+    return False
 
 
 def send_password_reset_email(to_email: str, reset_link: str) -> bool:

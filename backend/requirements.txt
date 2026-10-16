@@ -37,3 +37,4 @@ slowapi==0.1.10
 
 google-genai==2.19.0
 requests==2.34.2
+httpx=26.2.1

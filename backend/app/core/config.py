@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
 
+    # Email over HTTP API (Brevo). Needed on hosts that block SMTP ports (Render free tier).
+    # EMAIL_FROM must be a sender verified in Brevo; falls back to SMTP_USER if empty.
+    BREVO_API_KEY: str = ""
+    EMAIL_FROM: str = ""
+
     # External APIs (Phase 7+)
     OPENAI_API_KEY: str = ""
     GOOGLE_MAPS_API_KEY: str = ""
